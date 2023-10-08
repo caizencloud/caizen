@@ -1,0 +1,66 @@
+site_name: Caizen.cloud
+theme:
+  name: material
+  language: en
+  logo: img/logo.svg
+  favicon: img/favicon.png
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+    - toc.integrate
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.path
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+      primary: deep purple
+      accent: deep purple
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+      primary: deep purple
+      accent: deep purple
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.arithmatex:
+      generic: true
+  - footnotes
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.mark
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+extra:
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/caizencloud/caizen
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/bradgeesaman
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/in/bradgeesaman
+
+copyright: |
+  &copy; 2023 <a href="https://github.com/bgeesaman" target="_blank" rel="noopener">Brad Geesaman</a>
+
