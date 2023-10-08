@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TD
-  A[O: My Organization] --> B[F: Tenants]
+  A[O: MyOrganization] --> B[F: Tenants]
   A --> Z[Caizen Project]
   Z --> Dep(Caizen Deployment)
   B --> G[P: Tenant Dev]
