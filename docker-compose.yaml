@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  db:
+    image: memgraph/memgraph-platform
+    restart: on-failure
+    ports:
+      - 7687:7687
+      - 3000:3000
+      - 7444:7444
