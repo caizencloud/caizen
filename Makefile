@@ -38,7 +38,7 @@ tail:
 .PHONY: delete-all
 delete-all:
 	@echo "# Deleting everthing in the graph"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/delete-all.cypherl
+	@curl -s -XDELETE localhost:8000/resources -o /dev/null
 	@echo "# Done."
 
 .PHONY: load
@@ -49,3 +49,20 @@ load:
 	@echo "# Loading Resources into the graph"
 	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/load-resources.cypherl 
 	@echo "# Done."
+
+.PHONY: local
+local:
+	@docker compose up -d
+	@poetry run uvicorn main:api --app-dir api/ --reload
+
+.PHONY: lint
+lint:
+	@poetry run flake8 api tests
+
+.PHONY: get-all
+get-all:
+	@curl -s -H "Content-type: application/json" localhost:8000/resources | jq
+
+.PHONY: query-all
+query-all:
+	@curl -s -XPOST -d'{"query": "MATCH (n)-[r]->(d) return n,r,d"}' -H "Content-type: application/json" localhost:8000/q | jq
