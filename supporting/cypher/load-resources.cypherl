@@ -160,7 +160,7 @@ MERGE (cr)-[:HAS_DB_CONNECTION]->(cs)
 ;
 
 MERGE (cs:GCP_IAM_SERVICEACCOUNT {
-  id:      "api@ln-prod-web.iam.gserviceaccount.com/123",
+  id:      "api-sa@ln-prod-web.iam.gserviceaccount.com/123",
   type:    "iam.googleapis.com/serviceaccount_id",
   display: "SA ID: api:123",
   name:    "api:123",
@@ -196,7 +196,7 @@ MERGE (cr)-[:HAS_CHILD]->(crr)
 MERGE (cr)-[:HAS_REVISION {latest: true, percent: 100}]->(crr)
 MERGE (crr)-[:HAS_PARENT]->(cr)
 MERGE (crr)-[:IN_PROJECT]->(p)
-MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:api@ln-prod-web.iam.gserviceaccount.com", name:"api@ln-prod-web.iam.gserviceaccount.com", type:"serviceAccount", display: "SA: api@ln-prod-web"})
+MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", name:"api-sa@ln-prod-web.iam.gserviceaccount.com", type:"serviceAccount", display: "SA: api-sa@ln-prod-web"})
 MERGE (p)-[:HAS_CHILD]->(gsa)
 MERGE (gsa)-[:IN_PROJECT]->(p)
 MERGE (crr)-[:HAS_SERVICEACCOUNT]->(gsa)
@@ -204,12 +204,12 @@ MERGE (scope:GCP_IAM_OAUTHSCOPE {id:"https://www.googleapis.com/auth/cloud-platf
 MERGE (crr)-[:HAS_OAUTHSCOPE]->(scope)
 MERGE (region:GCP_REGION {id:"us-central1"})
 MERGE (crr)-[:IN_REGION]->(region)
-MERGE (iam:GCP_IAM_SERVICEACCOUNT {id:"api@ln-prod-web.iam.gserviceaccount.com/123"})
+MERGE (iam:GCP_IAM_SERVICEACCOUNT {id:"api-sa@ln-prod-web.iam.gserviceaccount.com/123"})
 MERGE (gsa)-[:HAS_SERVICEACCOUNTID]->(iam)
 MERGE (ir:GCP_IAM_ROLE {id:"roles/cloudsql.instanceUser", display: "Role: Cloud SQL Instance User"})
 MERGE (gsa)-[:HAS_IAMROLE {name: "roles/cloudsql.instanceUser"}]->(p)
 MERGE (gsa)-[:HAS_ACCESSVIA {resource: "cloudresourcemanager.googleapis.com/projects/18879573367", resource_type:"GCP_CLOUDRESOURCEMANAGER_PROJECT"}]->(ir)
-MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:api@ln-prod-web.iam.gserviceaccount.com", identity_name: "api@ln-prod-web.iam.gserviceaccount.com", identity_type: "serviceAccount"}]->(p)
+MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", identity_name: "api-sa@ln-prod-web.iam.gserviceaccount.com", identity_type: "serviceAccount"}]->(p)
 ;
 
 MERGE (ar:GCP_ARTIFACTREGISTRY_REPOSITORY {
@@ -355,8 +355,8 @@ MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:18879573367@cloudbuild.gserv
 
 // MERGE (p:GCP_CLOUDRESOURCEMANAGER_PROJECT {id:"cloudresourcemanager.googleapis.com/projects/18879573367"})
 // MERGE (ir:GCP_IAM_ROLE {id:"roles/editor", display: "Role: Project Editor"})
-// MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:api@ln-prod-web.iam.gserviceaccount.com", name:"api@ln-prod-web.iam.gserviceaccount.com", type:"serviceAccount", display: "SA: api@ln-prod-web"})
+// MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", name:"api-sa@ln-prod-web.iam.gserviceaccount.com", type:"serviceAccount", display: "SA: api-sa@ln-prod-web"})
 // MERGE (gsa)-[:HAS_IAMROLE {name: "roles/editor"}]->(p)
 // MERGE (gsa)-[:HAS_ACCESSVIA {resource: "cloudresourcemanager.googleapis.com/projects/18879573367", resource_type:"GCP_CLOUDRESOURCEMANAGER_PROJECT"}]->(ir)
-// MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:api@ln-prod-web.iam.gserviceaccount.com", identity_name: "api@ln-prod-web.iam.gserviceaccount.com", identity_type: "serviceAccount"}]->(p)
+// MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", identity_name: "api-sa@ln-prod-web.iam.gserviceaccount.com", identity_type: "serviceAccount"}]->(p)
 // ;
