@@ -50,6 +50,21 @@ load:
 	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/load-resources.cypherl 
 	@echo "# Done."
 
+.PHONY: load-meta
+load-meta:
+	@echo "Loading meta resources"
+	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/network-meta.cypherl
+
+.PHONY: load-changed-image
+load-changed-image:
+	@echo "Loading changed resources"
+	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/change-image.cypherl
+
+.PHONY: run-paths
+run-paths:
+	@echo "Running Attack Paths"
+	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/paths.cypherl
+
 .PHONY: local
 local:
 	@docker compose up -d

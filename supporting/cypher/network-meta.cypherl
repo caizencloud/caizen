@@ -1,0 +1,79 @@
+CREATE INDEX ON :INTERNET;
+CREATE INDEX ON :NETWORK;
+CREATE INDEX ON :NETWORK(id);
+CREATE INDEX ON :WORKLOAD;
+CREATE INDEX ON :WORKLOAD(id);
+CREATE INDEX ON :WORKLOAD(name);
+CREATE INDEX ON :CREDENTIAL;
+CREATE INDEX ON :CREDENTIAL(id);
+
+// Internet accessible cloud runs
+MATCH (allUsers:GCP_IDENTITY {id: "allUsers"})-[ir:HAS_IAMROLE {name: "roles/run.invoker"}]->(grs:GCP_RUN_SERVICE)
+SET grs:WORKLOAD, grs.meta = { is_public: true }
+MERGE (n:NETWORK:INTERNET {id: "0.0.0.0/0", name:"INTERNET", display: "Internet"})
+MERGE (n)-[ia:HAS_NETWORK_ACCESS {type: "network"}]-(grs)
+;
+
+// cloud runs with credentials
+MATCH (grs:GCP_RUN_SERVICE)-[hr:HAS_REVISION]->(crr:GCP_RUN_REVISION {state: "running"})
+MATCH (crr)-[hsa:HAS_SERVICEACCOUNT]->(gi:GCP_IDENTITY)
+MATCH (crr)-[:HAS_OAUTHSCOPE]->(scope:GCP_IAM_OAUTHSCOPE)
+SET grs:WORKLOAD, gi:CREDENTIAL
+WITH grs, gi, extract(s in [scope] | s.id) as scopes
+MERGE (grs)-[:CREDENTIAL_ACCESS {
+  type: "serviceAccount",
+  scopes: scopes,
+  cost: 10, score: 100, tech: "T1552", subtech: "005", title: "Unsecured Credentials: Cloud Instance Metadata API"
+  }]->(gi)
+;
+
+// credentials with privileges to databases
+MATCH path=(gi:GCP_IDENTITY)-[r:HAS_IAMROLE]->(p)-[c:HAS_CHILD *1..4]->(cs:GCP_CLOUDSQL_INSTANCE)
+WHERE labels(p)[0] in ["GCP_CLOUDRESOURCEMANAGER_PROJECT", "GCP_CLOUDRESOURCEMANAGER_FOLDER", "GCP_CLOUDRESOURCEMANAGER_ORGANIZATION"]
+and r.name in ["roles/cloudsql.instanceUser"]
+WITH gi, cs
+SET gi:CREDENTIAL, cs:STORAGE
+MERGE (gi)-[:IMPACT {cost: 20, score: 790, tech: "T1485", subtech: "000", title: "Data Destruction"}]->(cs)
+MERGE (gi)-[:IMPACT {cost: 20, score: 890, tech: "T1486", subtech: "000", title: "Data Encrypted for Impact"}]->(cs)
+;
+
+// initial access via public, vulnerable cloud runs
+MATCH (i:INTERNET)-[]->(w:WORKLOAD {meta: {is_public: true}})-[hr:HAS_REVISION]->(crr:GCP_RUN_REVISION {state: "running"})-[ri:RUNS_IMAGE]->(image)-[hv:HAS_VULNERABILITY]->(v:VULNERABILITY)
+WITH w, v, v.details.cvss as cvss
+WHERE cvss.attackVector = "NETWORK" and cvss.userInteraction = "NONE"
+WITH w, v, cvss, (1000 * log10(11.05 - cvss.baseScore)) as cost
+MERGE (u:USER {id: "anonymous", display: "Anonymous User"})
+MERGE (u)-[:INITIAL_ACCESS {cost: cost, score: 700, tech: "T1190", subtech: "000", title: "Exploit Public-Facing Application", meta: v.details }]->(w)
+MERGE (w)-[:IMPACT {cost: 10, score: 500, tech: "T1496", subtech: "000", title: "Resource Hijacking"}]->(w)
+;
+
+// creds with binding to org admin
+MATCH (gi:GCP_IDENTITY)-[hir:HAS_IAMROLE]->(o:GCP_CLOUDRESOURCEMANAGER_ORGANIZATION)
+WHERE hir.name = "roles/resourcemanager.organizationAdmin"
+SET gi:CREDENTIAL, o:CONTROL_PLANE
+WITH gi, o
+MERGE (gi)-[:IMPACT {
+  type: "PRIVILEGE_ESCALATION",
+  level: "OWNER",
+  cost: 100, score: 10000, tech: "T1078", subtech: "004", title: "Valid Accounts: Cloud Accounts",
+  escidentity: gi.name
+  }]->(o)
+;
+
+// creds with privesc to org owner
+MATCH (gi:GCP_IDENTITY)-[hir:HAS_IAMROLE]->(p:GCP_CLOUDRESOURCEMANAGER_PROJECT)
+MATCH (p)<-[ip:IN_PROJECT]-(gi2:GCP_IDENTITY)
+MATCH (gi2)-[hir3:HAS_IAMROLE]->(o)
+WHERE labels(o)[0] IN ["GCP_CLOUDRESOURCEMANAGER_ORGANIZATION"]
+and hir.name = "roles/editor"
+and gi != gi2
+and hir3.name = "roles/resourcemanager.organizationAdmin"
+SET gi:CREDENTIAL, o:CONTROL_PLANE, gi2:CREDENTIAL
+WITH gi, gi2, o
+MERGE (gi)-[:IMPACT {
+  type: "PRIVILEGE_ESCALATION",
+  level: "OWNER",
+  cost: 100, score: 100000, tech: "T1078", subtech: "004", title: "Valid Accounts: Cloud Accounts",
+  escidentity: gi2.name
+  }]->(o)
+;

@@ -1,0 +1,20 @@
+MATCH path=(u:USER)-[r:INITIAL_ACCESS|:CREDENTIAL_ACCESS|:PRIVILEGE_ESCALATION|:IMPACT *1..10]->(e)
+WHERE u.id = "anonymous" and (e:USER or e:WORKLOAD or e:CREDENTIAL or e:STORAGE or e:CONTROL_PLANE)
+WITH
+  path,
+  nodes(path) as n,
+  relationships(path) AS e,
+  extract(e in relationships(path)| toFloat(1000 - e.cost)/1000) as tcost,
+  extract(e in relationships(path)| e.tech + "." + e.subtech) as techs
+WITH
+  path,
+  n,
+  e,
+  toFloat(0.900) as threat,
+  reduce(tlikelihood = 1, tc IN tcost | tlikelihood * tc) as likelihood,
+  reduce(impact = 0, rel in relationships(path) | impact + rel.score) as impact, techs
+WITH path, n, e[-1] as last_edge, threat, likelihood, impact, (threat * likelihood * impact) as risk, techs
+WHERE risk > 0 and type(last_edge) IN ["IMPACT"] and all(rel in relationships(path)[1..size(relationships(path))-2] WHERE type(rel) IN ["IMPACT"]) IS NULL
+RETURN DISTINCT path, last_edge, threat, likelihood, impact, risk, techs
+ORDER BY risk desc
+;
