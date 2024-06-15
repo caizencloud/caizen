@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.encoders import jsonable_encoder
 
-from models import CypherQuery
+from models import CypherQuery, ChangeSet, AttackPath
 from db.graph_db import Database
+from db.load_data import ProcessPaths, AttackPaths
 
 db = Database("bolt://localhost:7687", "", "")
 
@@ -33,4 +33,20 @@ def graph_query(cq: CypherQuery):
     try:
         return {"result": db.execute_query(cq.query, raw=True)}
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Failed to execute query")
+        raise HTTPException(status_code=401, detail="Failed to execute query")
+    
+@api.post("/changeset")
+def graph_query(cs: ChangeSet):
+    try:
+        paths = ProcessPaths(db, cs).get_paths()
+        return {"result": paths}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Failed to execute changeset")
+
+@api.get("/attackpaths")
+def graph_query(ap: AttackPath):
+    try:
+        paths = AttackPaths(db, ap).get_paths()
+        return {"result": paths}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Failed to execute changeset")

@@ -16,12 +16,12 @@ resource "google_project_iam_member" "sql" {
   role    = "roles/cloudsql.instanceUser"
   member  = "serviceAccount:${google_service_account.api.email}"
 }
-// SA is Editor
-resource "google_project_iam_member" "editor" {
-  project = "ln-prod-web"
-  role    = "roles/editor"
-  member  = "serviceAccount:${google_service_account.api.email}"
-}
+// // SA is Editor
+// resource "google_project_iam_member" "editor" {
+//   project = "ln-prod-web"
+//   role    = "roles/editor"
+//   member  = "serviceAccount:${google_service_account.api.email}"
+// }
 
 
 // Cloud Run Service
@@ -33,7 +33,7 @@ resource "google_cloud_run_v2_service" "api" {
   template {
     service_account = google_service_account.api.email
     containers {
-      image = "us-central1-docker.pkg.dev/ln-prod-automation/docker/api:1.1.2"
+      image = "us-central1-docker.pkg.dev/ln-prod-automation/docker/api:1.1.1"
     }
   }
 }

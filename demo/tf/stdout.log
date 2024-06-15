@@ -1,114 +1,114 @@
-[02:57:45.229] Loading script /Users/bg/code/github/caizencloud/psychiac/addon.py
-[02:57:45.231] HTTP(S) proxy listening at *:8080.
-[02:57:45.364][[::1]:53239] client connect
-[02:57:45.373][[::1]:53239] server connect oauth2.googleapis.com:443 (64.233.180.95:443)
-[::1]:53239: POST https://oauth2.googleapis.com/token HTTP/2.0
- << HTTP/2.0 200 OK 966b
-[02:57:45.453][[::1]:53241] client connect
-[02:57:45.461][[::1]:53241] server connect openidconnect.googleapis.com:443 (172.253.115.95:443)
-[::1]:53241: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
+[23:49:22.401] Loading script /Users/bg/code/github/caizencloud/psychiac/addon.py
+[23:49:22.403] HTTP(S) proxy listening at *:8080.
+[23:49:22.542][[::1]:60508] client connect
+[23:49:22.549][[::1]:60508] server connect oauth2.googleapis.com:443 (172.253.122.95:443)
+[::1]:60508: POST https://oauth2.googleapis.com/token HTTP/2.0
+ << HTTP/2.0 200 OK 971b
+[23:49:22.627][[::1]:60510] client connect
+[23:49:22.637][[::1]:60510] server connect openidconnect.googleapis.com:443 (142.251.163.95:443)
+[::1]:60510: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
  << HTTP/2.0 200 OK 216b
-[::1]:53239: POST https://oauth2.googleapis.com/token HTTP/2.0
- << HTTP/2.0 200 OK 964b
-[::1]:53241: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
+[::1]:60508: POST https://oauth2.googleapis.com/token HTTP/2.0
+ << HTTP/2.0 200 OK 969b
+[::1]:60510: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
  << HTTP/2.0 200 OK 216b
-[::1]:53239: POST https://oauth2.googleapis.com/token HTTP/2.0
- << HTTP/2.0 200 OK 967b
-[02:57:45.708][[::1]:53243] client connect
-[02:57:45.721][[::1]:53243] server connect iam.googleapis.com:443 (64.233.180.95:443)
-[::1]:53243: GET https://iam.googleapis.com/v1/projects/ln-prod-web/serv… HTTP/2.0
+[::1]:60508: POST https://oauth2.googleapis.com/token HTTP/2.0
+ << HTTP/2.0 200 OK 970b
+[23:49:22.879][[::1]:60512] client connect
+[23:49:22.890][[::1]:60512] server connect iam.googleapis.com:443 (142.251.16.95:443)
+[::1]:60512: GET https://iam.googleapis.com/v1/projects/ln-prod-web/serv… HTTP/2.0
  << HTTP/2.0 200 OK 197b
-[02:57:45.823][[::1]:53245] client connect
-[02:57:45.828][[::1]:53247] client connect
-[02:57:45.833][[::1]:53245] server connect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
-[02:57:45.837][[::1]:53247] server connect run.googleapis.com:443 (172.253.63.95:443)
-[02:57:45.854] Storing IAM policy for project: ln-prod-web
-[::1]:53245: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
- << HTTP/2.0 200 OK 301b
-[::1]:53247: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
+[23:49:23.016][[::1]:60514] client connect
+[23:49:23.022][[::1]:60516] client connect
+[23:49:23.026][[::1]:60514] server connect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
+[23:49:23.034][[::1]:60516] server connect run.googleapis.com:443 (172.253.115.95:443)
+[23:49:23.054] Storing IAM policy for project: ln-prod-web
+[::1]:60516: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
  << HTTP/2.0 200 OK 923b
-[::1]:53247: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
+[::1]:60514: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+ << HTTP/2.0 200 OK 301b
+[::1]:60516: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
  << HTTP/2.0 200 OK 131b
-[02:57:46.446][[::1]:53247] client disconnect
-[02:57:46.447][[::1]:53245] client disconnect
-[02:57:46.447][[::1]:53247] server disconnect run.googleapis.com:443 (172.253.63.95:443)
-[02:57:46.448][[::1]:53245] server disconnect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
-[02:57:46.448][[::1]:53243] client disconnect
-[02:57:46.448][[::1]:53241] client disconnect
-[02:57:46.448][[::1]:53239] client disconnect
-[02:57:46.449][[::1]:53243] server disconnect iam.googleapis.com:443 (64.233.180.95:443)
-[02:57:46.449][[::1]:53241] server disconnect openidconnect.googleapis.com:443 (172.253.115.95:443)
-[02:57:46.449][[::1]:53239] server disconnect oauth2.googleapis.com:443 (64.233.180.95:443)
-[02:57:46.576][[::1]:53251] client connect
-[02:57:46.586][[::1]:53251] server connect oauth2.googleapis.com:443 (64.233.180.95:443)
-[::1]:53251: POST https://oauth2.googleapis.com/token HTTP/2.0
+[23:49:23.596][[::1]:60516] client disconnect
+[23:49:23.597][[::1]:60516] server disconnect run.googleapis.com:443 (172.253.115.95:443)
+[23:49:23.597][[::1]:60514] client disconnect
+[23:49:23.597][[::1]:60512] client disconnect
+[23:49:23.597][[::1]:60510] client disconnect
+[23:49:23.597][[::1]:60508] client disconnect
+[23:49:23.598][[::1]:60514] server disconnect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
+[23:49:23.598][[::1]:60512] server disconnect iam.googleapis.com:443 (142.251.16.95:443)
+[23:49:23.599][[::1]:60510] server disconnect openidconnect.googleapis.com:443 (142.251.163.95:443)
+[23:49:23.599][[::1]:60508] server disconnect oauth2.googleapis.com:443 (172.253.122.95:443)
+[23:49:23.731][[::1]:60521] client connect
+[23:49:23.738][[::1]:60521] server connect oauth2.googleapis.com:443 (172.253.122.95:443)
+[::1]:60521: POST https://oauth2.googleapis.com/token HTTP/2.0
  << HTTP/2.0 200 OK 966b
-[02:57:46.658][[::1]:53253] client connect
-[02:57:46.665][[::1]:53253] server connect openidconnect.googleapis.com:443 (172.253.115.95:443)
-[::1]:53253: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
+[23:49:23.815][[::1]:60523] client connect
+[23:49:23.825][[::1]:60523] server connect openidconnect.googleapis.com:443 (142.251.163.95:443)
+[::1]:60523: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
  << HTTP/2.0 200 OK 216b
-[::1]:53251: POST https://oauth2.googleapis.com/token HTTP/2.0
- << HTTP/2.0 200 OK 963b
-[::1]:53253: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
+[::1]:60521: POST https://oauth2.googleapis.com/token HTTP/2.0
+ << HTTP/2.0 200 OK 971b
+[::1]:60523: GET https://openidconnect.googleapis.com/v1/userinfo?alt=js… HTTP/2.0
  << HTTP/2.0 200 OK 216b
-[::1]:53251: POST https://oauth2.googleapis.com/token HTTP/2.0
- << HTTP/2.0 200 OK 964b
-[02:57:46.924][[::1]:53255] client connect
-[02:57:46.932][[::1]:53255] server connect run.googleapis.com:443 (172.253.63.95:443)
-[02:57:46.946] Storing operation in PENDING: operation-run-patch-ln-prod-web-us-central1-api
-[02:57:46.946] Getting a Cloud Run Operation: operation-run-patch-ln-prod-web-us-central1-api
-[02:57:46.946] Setting operation to DONE: operation-run-patch-ln-prod-web-us-central1-api
-[02:57:46.946] b'{"name": "projects/ln-prod-web/locations/us-central1/operations/2906768765359700055", "done": true}'
-[02:57:46.946] 
-[::1]:53255: PATCH https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
+[::1]:60521: POST https://oauth2.googleapis.com/token HTTP/2.0
+ << HTTP/2.0 200 OK 969b
+[23:49:24.125][[::1]:60525] client connect
+[23:49:24.134][[::1]:60525] server connect run.googleapis.com:443 (172.253.115.95:443)
+[23:49:24.157] Storing operation in PENDING: operation-run-patch-ln-prod-web-us-central1-api
+[23:49:24.157] Getting a Cloud Run Operation: operation-run-patch-ln-prod-web-us-central1-api
+[23:49:24.157] Setting operation to DONE: operation-run-patch-ln-prod-web-us-central1-api
+[23:49:24.158] b'{"name": "projects/ln-prod-web/locations/us-central1/operations/2622232935577138535", "done": true}'
+[23:49:24.158] 
+[::1]:60525: PATCH https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
  << HTTP/1.1 200 OK 99b
-[::1]:53255: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
+[::1]:60525: GET https://run.googleapis.com/v2/projects/ln-prod-web/loca… HTTP/2.0
  << HTTP/2.0 200 OK 923b
-[02:57:49.863][[::1]:53257] client connect
-[02:57:49.874][[::1]:53257] server connect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
-[02:57:49.899] Storing IAM policy for project: ln-prod-web
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:27.049][[::1]:60527] client connect
+[23:49:27.061][[::1]:60527] server connect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
+[23:49:27.086] Storing IAM policy for project: ln-prod-web
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/2.0 200 OK 301b
-[02:57:50.069] Returning IAM policy for project: ln-prod-web
-[02:57:50.070] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
-[02:57:50.070] 
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:27.200] Returning IAM policy for project: ln-prod-web
+[23:49:27.200] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
+[23:49:27.200] 
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/1.1 200 OK 1.1k
-[02:57:51.078] Fetching IAM policy for project: ln-prod-web
-[02:57:51.078] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
-[02:57:51.078] 
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:28.203] Fetching IAM policy for project: ln-prod-web
+[23:49:28.203] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
+[23:49:28.203] 
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/1.1 200 OK 1.1k
-[02:57:52.085] Fetching IAM policy for project: ln-prod-web
-[02:57:52.086] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
-[02:57:52.086] 
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:29.210] Fetching IAM policy for project: ln-prod-web
+[23:49:29.210] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
+[23:49:29.211] 
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/1.1 200 OK 1.1k
-[02:57:53.094] Fetching IAM policy for project: ln-prod-web
-[02:57:53.094] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
-[02:57:53.094] 
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:30.219] Fetching IAM policy for project: ln-prod-web
+[23:49:30.220] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
+[23:49:30.220] 
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/1.1 200 OK 1.1k
-[02:57:53.099] Fetching IAM policy for project: ln-prod-web
-[02:57:53.099] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
-[02:57:53.099] 
-[::1]:53257: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
+[23:49:30.225] Fetching IAM policy for project: ln-prod-web
+[23:49:30.225] b'{"bindings": [{"members": ["serviceAccount:18879573367@cloudbuild.gserviceaccount.com"], "role": "roles/cloudbuild.builds.builder"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-cloudbuild.iam.gserviceaccount.com"], "role": "roles/cloudbuild.serviceAgent"}, {"members": ["serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/cloudsql.instanceUser"}, {"members": ["serviceAccount:service-18879573367@containerregistry.iam.gserviceaccount.com"], "role": "roles/containerregistry.ServiceAgent"}, {"members": ["serviceAccount:18879573367-compute@developer.gserviceaccount.com", "serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com"], "role": "roles/editor"}, {"members": ["user:bradgeesaman@lonimbus.com"], "role": "roles/owner"}, {"members": ["serviceAccount:service-18879573367@gcp-sa-pubsub.iam.gserviceaccount.com"], "role": "roles/pubsub.serviceAgent"}, {"members": ["serviceAccount:service-18879573367@serverless-robot-prod.iam.gserviceaccount.com"], "role": "roles/run.serviceAgent"}], "etag": "BwYa0drC95g=", "version": 3, "name": "projects/ln-prod-web"}'
+[23:49:30.225] 
+[::1]:60527: POST https://cloudresourcemanager.googleapis.com/v1/projects… HTTP/2.0
  << HTTP/1.1 200 OK 1.1k
-[02:57:53.114][[::1]:53257] client disconnect
-[02:57:53.114][[::1]:53257] server disconnect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
-[02:57:53.114][[::1]:53255] client disconnect
-[02:57:53.114][[::1]:53253] client disconnect
-[02:57:53.115][[::1]:53251] client disconnect
-[02:57:53.115][[::1]:53255] server disconnect run.googleapis.com:443 (172.253.63.95:443)
-[02:57:53.115][[::1]:53253] server disconnect openidconnect.googleapis.com:443 (172.253.115.95:443)
-[02:57:53.115][[::1]:53251] server disconnect oauth2.googleapis.com:443 (64.233.180.95:443)
-[02:57:53.125] writing assets to file...
+[23:49:30.241][[::1]:60527] client disconnect
+[23:49:30.241][[::1]:60527] server disconnect cloudresourcemanager.googleapis.com:443 (142.251.167.95:443)
+[23:49:30.242][[::1]:60525] client disconnect
+[23:49:30.242][[::1]:60523] client disconnect
+[23:49:30.242][[::1]:60521] client disconnect
+[23:49:30.243][[::1]:60525] server disconnect run.googleapis.com:443 (172.253.115.95:443)
+[23:49:30.243][[::1]:60523] server disconnect openidconnect.googleapis.com:443 (142.251.163.95:443)
+[23:49:30.243][[::1]:60521] server disconnect oauth2.googleapis.com:443 (172.253.122.95:443)
+[23:49:30.254] writing assets to file...
 [
   {
     "name": "https://run.googleapis.com/v2/projects/ln-prod-web/locations/us-central1/services/api",
     "type": "gcp_run_service",
     "action": "UPSERT",
-    "update_time": "2024-06-14T02:57:53.125357",
+    "update_time": "2024-06-14T23:49:30.254962",
     "data": {
       "ingress": "INGRESS_TRAFFIC_ALL",
       "launchStage": "GA",
@@ -161,7 +161,7 @@
     "name": "projects/ln-prod-web",
     "type": "gcp_cloudresourcemanager_iam_policy",
     "action": "UPSERT",
-    "update_time": "2024-06-14T02:57:53.125363",
+    "update_time": "2024-06-14T23:49:30.254978",
     "data": {
       "bindings": [
         {
@@ -220,4 +220,4 @@
     }
   }
 ]
-[02:57:53.125] Done
+[23:49:30.255] Done

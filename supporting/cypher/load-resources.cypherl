@@ -351,12 +351,3 @@ MERGE (gsa)-[:HAS_IAMROLE {name: "roles/resourcemanager.organizationAdmin"}]->(o
 MERGE (gsa)-[:HAS_ACCESSVIA {resource: "cloudresourcemanager.googleapis.com/organizations/684587186245", resource_type:"GCP_CLOUDRESOURCEMANAGER_ORGANIZATION"}]->(ir)
 MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:18879573367@cloudbuild.gserviceaccount.com", identity_name: "18879573367@cloudbuild.gserviceaccount.com", identity_type: "serviceAccount"}]->(org)
 ;
-
-
-// MERGE (p:GCP_CLOUDRESOURCEMANAGER_PROJECT {id:"cloudresourcemanager.googleapis.com/projects/18879573367"})
-// MERGE (ir:GCP_IAM_ROLE {id:"roles/editor", display: "Role: Project Editor"})
-// MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", name:"api-sa@ln-prod-web.iam.gserviceaccount.com", type:"serviceAccount", display: "SA: api-sa@ln-prod-web"})
-// MERGE (gsa)-[:HAS_IAMROLE {name: "roles/editor"}]->(p)
-// MERGE (gsa)-[:HAS_ACCESSVIA {resource: "cloudresourcemanager.googleapis.com/projects/18879573367", resource_type:"GCP_CLOUDRESOURCEMANAGER_PROJECT"}]->(ir)
-// MERGE (ir)-[:IS_GRANTEDTO {identity:"serviceAccount:api-sa@ln-prod-web.iam.gserviceaccount.com", identity_name: "api-sa@ln-prod-web.iam.gserviceaccount.com", identity_type: "serviceAccount"}]->(p)
-// ;

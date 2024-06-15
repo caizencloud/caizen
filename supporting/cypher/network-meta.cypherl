@@ -43,7 +43,9 @@ WITH w, v, v.details.cvss as cvss
 WHERE cvss.attackVector = "NETWORK" and cvss.userInteraction = "NONE"
 WITH w, v, cvss, (1000 * log10(11.05 - cvss.baseScore)) as cost
 MERGE (u:USER {id: "anonymous", display: "Anonymous User"})
-MERGE (u)-[:INITIAL_ACCESS {cost: cost, score: 700, tech: "T1190", subtech: "000", title: "Exploit Public-Facing Application", meta: v.details }]->(w)
+MERGE (u)-[r:INITIAL_ACCESS {cost: cost, score: 700, tech: "T1190", subtech: "000", title: "Exploit Public-Facing Application", meta: v.details}]->(w)
+ON CREATE SET r.updated_at = 123
+ON MATCH SET r.updated_at = 123
 MERGE (w)-[:IMPACT {cost: 10, score: 500, tech: "T1496", subtech: "000", title: "Resource Hijacking"}]->(w)
 ;
 
