@@ -63,7 +63,7 @@ load-changed-image:
 .PHONY: run-paths
 run-paths:
 	@echo "Running Attack Paths"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/paths.cypherl
+	@curl -H "Content-type: application/json" -d'{"threat":0.9}' -XGET -s localhost:8000/attackpaths | jq -r '.result[]'
 
 .PHONY: local
 local:
