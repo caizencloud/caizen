@@ -59,6 +59,9 @@ If we map our cloud resources in full like this:
 Then we can derive Attack Paths like this:
 <img src="docs/img/attackpaths.png" width="640">
 
+And score them like this:
+<img src="docs/img/pathscores.png" width="640">
+
 Which enables us to measure risky combinations in our cloud configurations by modeling attacker behavior to resource goals/sub-goals using [MITRE ATT&CK® Framework](https://attack.mitre.org/) [Tactics, Techniques, and Procedures](https://attack.mitre.org/resources/) or "TTPs".
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
