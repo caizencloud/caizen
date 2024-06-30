@@ -5,13 +5,13 @@
 <br />
 <div align="center">
   <a href="https://github.com/caizencloud/caizen">
-    <img src="docs/img/caizen-logo-dark.png" alt="Logo" width="80" height="80">
+    <img src="docs/img/caizen-logo-dark.png" alt="Logo" width="160" height="160">
   </a>
 
   <h3 align="center">CAIZEN</h3>
 
   <p align="center">
-    Harness the security superpowers of your GCP cloud asset inventory
+    Harness the security superpowers of your GCP Cloud Asset Inventory.
     <br />
     <br />
     <a href="https://youtu.be/Bltr5Bn2-70">View fwd:cloudsec 2024 Talk</a>
