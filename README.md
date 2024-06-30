@@ -67,6 +67,8 @@ And score them like this:
 
 Which enables us to measure risky combinations in our cloud configurations by modeling attacker behavior to resource goals/sub-goals using [MITRE ATT&CK® Framework](https://attack.mitre.org/) [Tactics, Techniques, and Procedures](https://attack.mitre.org/resources/) or "TTPs".
 
+As a proof-of-concept, a companion tool was created named [Psychiac](https://github.com/caizencloud/psychiac) to demonstrate the value of evaluating attack paths on proposed changes by Terraform _before apply_ in a CI pipeline.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
