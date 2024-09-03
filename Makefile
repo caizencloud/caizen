@@ -8,8 +8,7 @@ help:
 	@echo "tail - tail the container logs"
 	@echo "ui - open the memgraph UI"
 	@echo "--"
-	@echo "delete-all - empty the graph db"
-	@echo "load - load resources into the graph db"
+	@echo "local - Run caizen locally"
 
 .PHONY: serve
 serve:
@@ -21,11 +20,11 @@ view:
 
 .PHONY: up
 up:
-	@docker compose up -d
+	@docker compose up -d -f docker/docker-compose.yml
 
 .PHONY: down
 down:
-	@docker compose down
+	@docker compose down -f docker/docker-compose.yml
 
 .PHONY: ui
 ui:
@@ -35,49 +34,7 @@ ui:
 tail:
 	@docker-compose logs -f
 
-.PHONY: delete-all
-delete-all:
-	@echo "# Deleting everthing in the graph"
-	@curl -s -XDELETE localhost:8000/resources -o /dev/null
-	@echo "# Done."
-
-.PHONY: load
-load:
-	@echo "# Deleting everthing in the graph"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/delete-all.cypherl
-	@echo "# Done."
-	@echo "# Loading Resources into the graph"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/load-resources.cypherl 
-	@echo "# Done."
-
-.PHONY: load-meta
-load-meta:
-	@echo "Loading meta resources"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/network-meta.cypherl
-
-.PHONY: load-changed-image
-load-changed-image:
-	@echo "Loading changed resources"
-	@docker exec -i caizen-db-1 mgconsole < supporting/cypher/change-image.cypherl
-
-.PHONY: run-paths
-run-paths:
-	@echo "Running Attack Paths"
-	@curl -H "Content-type: application/json" -d'{"threat":0.9}' -XGET -s localhost:8000/attackpaths | jq -r '.result[]'
-
 .PHONY: local
 local:
 	@docker compose up -d
-	@poetry run uvicorn main:api --app-dir api/ --reload
-
-.PHONY: lint
-lint:
-	@poetry run flake8 api tests
-
-.PHONY: get-all
-get-all:
-	@curl -s -H "Content-type: application/json" localhost:8000/resources | jq
-
-.PHONY: query-all
-query-all:
-	@curl -s -XPOST -d'{"query": "MATCH (n)-[r]->(d) return n,r,d"}' -H "Content-type: application/json" localhost:8000/q | jq
+	@poetry run uvicorn main:app --app-dir app/ --reload

@@ -1,5 +1,0 @@
-MERGE (p:GCP_CLOUDRESOURCEMANAGER_PROJECT {id:"cloudresourcemanager.googleapis.com/projects/600042827295"})
-MERGE (gsa:GCP_IDENTITY {id:"serviceAccount:main-app@gs-app-dev-350500.iam.gserviceaccount.com", name:"main-app@gs-app-dev-350500.iam.gserviceaccount.com", type:"serviceAccount"})
-MERGE (p)-[:HAS_CHILD]->(gsa)
-MERGE (gsa)-[:IN_PROJECT]->(p)
-;
