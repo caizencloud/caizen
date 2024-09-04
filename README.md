@@ -32,14 +32,7 @@
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contributing">Contributing</a></li>
@@ -85,41 +78,7 @@ As a proof-of-concept, a companion tool was created named [Psychiac](https://git
 <!-- GETTING STARTED -->
 ## Getting Started
 
-To get a local copy up and running follow these simple example steps.
-
-### Prerequisites
-
-1. Install [Docker](https://www.docker.com/)
-2. Install python 3.11+
-3. Install [Poetry](https://python-poetry.org/docs/#installation)
-
-### Installation
-
-1. Run `poetry install` to install the dependencies
-2. See the <a href="#usage">Usage</a> section for loading some data into the graph
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-<!-- USAGE EXAMPLES -->
-## Usage
-
-This project is currently only runnable in a demo-like fashion to showcase the potential value.
-
-Run the following in one terminal to start the graph db container and the API:
-```
-make local
-```
-
-Load some sample resource data into the graph:
-```
-make load && make load-meta
-```
-
-Visit [localhost:3000](http://localhost:3000) to view the Memgraph UI and run some queries.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
+The project is undergoing active development to go from PoC to real-time resource graph.  Stay tuned.
 
 
 <!-- ROADMAP -->
