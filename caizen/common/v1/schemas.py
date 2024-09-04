@@ -1,27 +1,48 @@
-from typing import Optional, Any
 from datetime import datetime
-from pydantic import BaseModel, ValidationError, field_validator
+from typing import Literal, Optional
 
-class CaizenAssetFormatAssetV1(BaseModel):
-    name: str
-    type: str
-    action: str
-    created: datetime
-    updated: datetime
-    attrs: Optional[Any] = None
+from pydantic import BaseModel, field_validator
 
-    def upsert(self):
-        print(f"Upserting {self.name} of type {self.type} with {self.attrs}")
-
-    def delete(self):
-        print(f"Deleting {self.name} of type {self.type}")
 
 class CaizenAssetFormatV1(BaseModel):
-    version: int
-    asset: CaizenAssetFormatAssetV1
+    """Model for all v1 'asset' payloads."""
 
-    @field_validator('version')
+    name: str
+    type: str
+    action: Literal["upsert", "delete"]
+    created: datetime
+    updated: datetime
+    attrs: Optional[dict] = None
+
+    def upsert(self):
+        raise NotImplementedError
+
+    def delete(self):
+        raise NotImplementedError
+
+
+class CaizenAssetV1(BaseModel):
+    """Outermost model of the versioned asset format."""
+
+    version: int
+    asset: CaizenAssetFormatV1
+
+    @field_validator("version")
     def ensure_version_is_1(cls, v):
         if v != 1:
-            raise ValueError('version must be equal to 1')
+            raise ValueError("version must be equal to 1")
         return v
+
+
+class ProcessedAsset(BaseModel):
+    """Model for the response of the /v1/asset endpoint."""
+
+    name: str
+    action: Literal["upsert", "delete"]
+
+
+class HealthStatus(BaseModel):
+    """Model for the response of the /status endpoint."""
+
+    status: str = "error"
+    msg: Optional[str] = None
