@@ -1,11 +1,15 @@
+import os
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from neo4j import AsyncGraphDatabase
-from src.v1.router import v1_router as v1_router
 
-from ..common.v1.schemas import HealthStatus
+# add the parent directory to the path
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from common.v1.schemas import HealthStatus  # noqa
+from src.v1.router import v1_router as v1_router  # noqa
 
 
 @asynccontextmanager
