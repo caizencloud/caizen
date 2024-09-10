@@ -8,7 +8,7 @@
     <img src="docs/img/caizen-logo-dark.png" alt="Logo" width="160" height="160">
   </a>
 
-  <h3 align="center">CAIZEN</h3>
+  <h3 align="center"><a href="https://caizen.cloud">CAIZEN</a></h3>
 
   <p align="center">
     Harness the security superpowers of your GCP Cloud Asset Inventory.
