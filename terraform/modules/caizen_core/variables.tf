@@ -56,9 +56,11 @@ variable "enabled_apis" {
   type        = list(string)
   default = [
     "cloudasset.googleapis.com",
+    "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "cloudfunctions.googleapis.com",
     "cloudscheduler.googleapis.com",
+    "eventarc.googleapis.com",
     "iam.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",

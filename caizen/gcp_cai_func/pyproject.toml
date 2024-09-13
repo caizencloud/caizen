@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "gcp-cai-func"
+version = "0.1.0"
+description = ""
+authors = ["Brad Geesaman <3769609+bgeesaman@users.noreply.github.com>"]
+license = "APACHE2.0"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+functions-framework = "^3.8.1"
+requests = "^2.32.3"
+flask-pydantic = "^0.12.0"
+google-cloud-logging = "^3.11.2"
+poetry-plugin-export = "^1.8.0"
+uvicorn = "^0.30.6"
+fastapi = "^0.114.1"
+a2wsgi = "^1.10.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

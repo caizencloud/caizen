@@ -3,7 +3,7 @@ locals {
   input_data = {
     "content_type" : var.target_content_type,
     "max_retries" : var.workflow_max_retries,
-    "output_bucket" : local.ingest_bucket_name,
+    "output_bucket" : var.ingest_bucket_name,
     "output_prefix" : var.module_name,
     "sleep_seconds" : var.workflow_sleep_seconds,
     "target_id" : var.target_id,

@@ -15,7 +15,6 @@ variable "name_prefix" {
     error_message = "name_prefix must start with a letter"
   }
 }
-
 variable "ingest_bucket_name" {
   description = "The name of the GCS bucket for all Caizen data ingest"
   type        = string
@@ -23,7 +22,7 @@ variable "ingest_bucket_name" {
 variable "module_name" {
   description = "The name of the module"
   type        = string
-  default     = "gcp_cai"
+  default     = "gcp-cai"
 }
 variable "labels" {
   description = "The labels to apply to all resources"

@@ -8,5 +8,5 @@ output "name_prefix" {
   value = var.name_prefix
 }
 output "ingest_bucket_name" {
-  value = var.ingest_bucket_name
+  value = "${var.name_prefix}-${var.ingest_bucket_name}"
 }
