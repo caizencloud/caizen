@@ -18,9 +18,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     URI = "bolt://localhost:7687"
     AUTH = ("", "")
     async with AsyncGraphDatabase.driver(URI, auth=AUTH) as driver:
-        async with driver.session(database="") as session:
-            app.db = session
-            yield
+        app.db = driver
+        yield
+        # async with driver.session(database="") as session:
+        #     app.db = session
+        #     yield
 
 
 app = FastAPI(

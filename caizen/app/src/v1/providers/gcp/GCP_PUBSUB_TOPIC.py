@@ -1,17 +1,14 @@
-from typing import Optional
-
 from common.v1.schemas import CaizenAssetFormatV1
 from neo4j import AsyncGraphDatabase
 from pydantic import BaseModel
 
 
-class GCP_STORAGE_BUCKET_ASSET_ATTRS_V1(BaseModel):
+class GCP_PUBSUB_TOPIC_ASSET_ATTRS_V1(BaseModel):
     location: str
-    replication: Optional[bool] = False
 
 
-class GCP_STORAGE_BUCKET_ASSET_V1(CaizenAssetFormatV1):
-    attrs: GCP_STORAGE_BUCKET_ASSET_ATTRS_V1
+class GCP_PUBSUB_TOPIC_ASSET_V1(CaizenAssetFormatV1):
+    attrs: GCP_PUBSUB_TOPIC_ASSET_ATTRS_V1
 
     async def upsert(self, db: AsyncGraphDatabase) -> None:
         session = db.session()
@@ -20,7 +17,10 @@ class GCP_STORAGE_BUCKET_ASSET_V1(CaizenAssetFormatV1):
             data = await result.single()
             count = data[0]
         print(f"{count} nodes")
-        print(f"BUCKET Upserting {self.name} of type {self.type}" f" with {self.attrs}")
+        print(
+            f"PUBSUB_TOPIC Upserting {self.name} of type {self.type}"
+            f" with {self.attrs}"
+        )
 
     async def delete(self, db: AsyncGraphDatabase) -> None:
-        print(f"BUCKET Deleting {self.name} of type {self.type}")
+        print(f"PUBSUB_TOPIC Deleting {self.name} of type {self.type}")

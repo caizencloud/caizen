@@ -24,9 +24,7 @@ async def process_asset(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
         # Call the upsert() or delete() method on the asset model
         await getattr(asset_model, asset_model.action)(db=db)
     except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to process asset: {e.detail}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to process asset: {e}")
 
     return ProcessedAsset(name=asset_model.name, action=asset_model.action)
 
@@ -56,7 +54,7 @@ async def find_asset_processor(asset_model) -> dict:
                 )
             parsed_model = default_model_name(**asset)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Processing error: {e.detail}")
+        raise HTTPException(status_code=400, detail=f"Processing error: {e}")
 
     return parsed_model
 

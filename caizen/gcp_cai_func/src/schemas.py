@@ -1,9 +1,26 @@
 import base64
 import json
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, HttpUrl, field_validator
+
+
+class CaiResource(BaseModel):
+    data: Optional[dict] = None
+    discovery_document_uri: HttpUrl
+    discovery_name: str
+    location: str
+    parent: str
+    version: str
+
+
+class CaiRecord(BaseModel):
+    ancestors: List[str]
+    asset_type: str
+    name: str
+    resource: CaiResource
+    update_time: datetime
 
 
 class StorageAttributes(BaseModel):
