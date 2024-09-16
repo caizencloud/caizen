@@ -22,6 +22,21 @@ class CaiRecord(BaseModel):
     resource: CaiResource
     update_time: datetime
 
+    @field_validator("asset_type")
+    def format_asset_type(cls, v):
+        parts = v.split("/")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid asset_type format {v}")
+
+        service = parts[0].split(".")[0].upper()  # "pubsub.googleapis.com" -> "PUBSUB"
+        resource = parts[1].upper()  # "Topic" -> "TOPIC"
+
+        return f"GCP_{service}_{resource}"
+
+    @field_validator("name")
+    def format_asset_name(cls, v):
+        return v.lstrip("//")
+
 
 class StorageAttributes(BaseModel):
     bucketId: str

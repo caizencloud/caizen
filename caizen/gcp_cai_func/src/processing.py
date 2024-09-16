@@ -6,7 +6,7 @@ from typing import Generator
 import requests
 from google.cloud import storage
 from pydantic import ValidationError
-from src.gcp.transform import transform_cai_data
+from src.gcp.transform import GCP_ASSET
 from src.schemas import CaiRecord
 
 
@@ -33,6 +33,43 @@ def stream_gcs_file(bucket_id: str, object_id: str) -> Generator[str, None, None
         raise Exception(f"Error fetching GCS file: {e}")
 
 
+def decode_json_line(line: str):
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding JSON: {e}")
+        raise Exception(f"Error decoding JSON: {e}")
+
+
+def validate_cai_record(data: dict):
+    try:
+        return CaiRecord(**data)
+    except ValidationError as e:
+        logging.error(f"Error validating CAI record: {e}")
+        raise Exception(f"Error validating CAI record: {e}")
+
+
+def transform_cai_record(cai_record):
+    try:
+        return GCP_ASSET.transform(cai_record)
+    except ValueError as e:
+        logging.error(f"Error transforming CAI record: {e}")
+        raise Exception(f"Error transforming CAI record: {e}")
+
+
+def send_to_caizen_api(api_url: str, headers: dict, caizen_asset_json: dict):
+    try:
+        response = requests.post(api_url, headers=headers, json=caizen_asset_json)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        logging.error(
+            f"Error sending request to CAIZEN API: {api_url} {caizen_asset_json} {e}"
+        )
+        raise Exception(
+            f"Error sending request to CAIZEN API: {api_url} {caizen_asset_json} {e}"
+        )
+
+
 def process_asset_line(line: str, api_url: str, headers: dict) -> None:
     """
     Process a single line and send it to the CAIZEN API as an "upsert" request.
@@ -46,26 +83,14 @@ def process_asset_line(line: str, api_url: str, headers: dict) -> None:
         None
     """
     try:
-        cai_record = CaiRecord(**json.loads(line))
-        caizen_asset = transform_cai_data(cai_record)
+        data = decode_json_line(line)
+        cai_record = validate_cai_record(data)
+        caizen_asset = transform_cai_record(cai_record)
         caizen_asset_json = json.loads(caizen_asset.model_dump_json(exclude_none=True))
-        response = requests.post(api_url, headers=headers, json=caizen_asset_json)
-        response.raise_for_status()
-    except json.JSONDecodeError as e:
-        logging.error(f"Error decoding JSON: {e}")
-        print(f"Error decoding JSON: {e}")
-    except ValidationError as e:
-        logging.error(f"Error validating CAI record: {e}")
-        print(f"Error validating CAI record: {e}")
-    except ValueError as e:
-        logging.error(f"Error transforming CAI record: {e}")
-        print(f"Error transforming CAI record: {e}")
-    except requests.RequestException as e:
-        logging.error(f"Error sending request to CAIZEN API: {e}")
-        print(f"Error sending request to CAIZEN API: {e}")
+        send_to_caizen_api(api_url, headers, caizen_asset_json)
     except Exception as e:
-        logging.error(f"Error processing asset: {e}")
-        print(f"Error processing asset: {e}")
+        logging.error(f"Error processing asset line: {e}")
+        raise Exception(f"Error processing asset line: {e}")
 
 
 def process_gcs_file(bucket_id: str, object_id: str) -> None:
@@ -93,4 +118,4 @@ def process_gcs_file(bucket_id: str, object_id: str) -> None:
                 future.result()
             except Exception as e:
                 logging.error(f"Error processing asset: {e}")
-                print(f"Error processing asset: {e}")
+                raise Exception(f"Error processing asset: {e}")

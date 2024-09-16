@@ -34,8 +34,11 @@ def main(request: Request) -> Response:
     try:
         process_gcs_file(bucket_id, object_id)
     except Exception as e:
-        logging.error(f"Error processing GCS file: {e}")
-        return Response(f"Error processing GCS file: {e}", status=500)
+        logging.error(f"Error processing GCS file: gs://{bucket_id}/{object_id}: {e}")
+        resp = NotificationResponse(
+            detail=f"Error processing GCS file: gs://{bucket_id}/{object_id}: {e}"
+        ).model_dump_json(exclude_none=True)
+        return Response(resp, status=500)
 
     # Log the file processed and respond 200 to the pubsub http trigger
     detail = f"gs://{bucket_id}/{object_id}"

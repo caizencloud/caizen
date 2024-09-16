@@ -4,78 +4,100 @@ from common.v1.schemas import CaizenAssetV1
 from src.schemas import CaiRecord
 
 
-def format_asset_type(input_string: str) -> str:
-    """
-    Format the asset type to match the CAIZEN schema.
-    Ex: pubsub.googleapis.com/Topic -> GCP_PUBSUB_TOPIC
+class GCP_ASSET:
+    def transform(cr) -> CaizenAssetV1:
+        """
+        Transform a CAI record into a CAIZEN asset.
 
-    Args:
-        asset_type: The asset type to format.
+        Args:
+            cai_record: The CAI record to transform.
 
-    Returns:
-        The formatted asset type.
-    """
-    try:
-        parts = input_string.split("/")
-        if len(parts) != 2:
-            raise ValueError(f"Invalid asset_type format {input_string}")
+        Returns:
+            The CAIZEN asset as a dictionary.
+        """
+        asset_version = cr.resource.version.lstrip("v")
+        # Use the earliest time as the created time
+        created = datetime.now(timezone.utc)
+        if created > cr.update_time:
+            created = cr.update_time
+        # Remove projects/ from ancestors and format as full paths
+        ancestors = [
+            "cloudresourcemanager.googleapis.com/" + a
+            for a in cr.ancestors
+            if not a.startswith("projects/")
+        ]
 
-        service = parts[0].split(".")[0].upper()  # "pubsub.googleapis.com" -> "PUBSUB"
-        resource = parts[1].upper()  # "Topic" -> "TOPIC"
-
-        return f"GCP_{service}_{resource}"
-
-    except (IndexError, AttributeError) as e:
-        # Handle errors related to string splitting or accessing elements
-        raise AttributeError(f"Error: Malformed input '{input_string}' - {str(e)}")
-
-    except ValueError as ve:
-        # Handle custom validation errors
-        raise ValueError(f"Error: {str(ve)}")
-
-
-def format_asset_name(input_string: str) -> str:
-    """
-    Format the asset name to match the CAIZEN schema.
-    Ex: //pubsub.googleapis.com/projects/caizen-export/topics/gcp-cai-caizen-topic
-    -> pubsub.googleapis.com/projects/caizen-export/topics/gcp-cai-caizen-topic
-
-    Args:
-        asset_name: The asset name to format.
-
-    Returns:
-        The formatted asset name.
-    """
-    return input_string.lstrip("//")
-
-
-def transform_cai_data(cai_record: CaiRecord) -> dict:
-    """
-    Transform a CAI record into a CAIZEN asset.
-
-    Args:
-        cai_record: The CAI record to transform.
-
-    Returns:
-        The CAIZEN asset as a dictionary.
-    """
-
-    cr = cai_record.model_dump()
-    name = format_asset_name(cr["name"])
-    asset_type = format_asset_type(cr["asset_type"])
-    cav1 = {
-        "version": 1,
-        "asset": {
-            "name": name,
-            "type": asset_type,
-            "action": "upsert",
-            "created": datetime.now(timezone.utc),
-            "updated": cr["update_time"],
-            "attrs": {
-                "location": cr["resource"]["location"],
+        cav1 = {
+            "version": asset_version,
+            "asset": {
+                "name": cr.name,
+                "type": cr.asset_type,
+                "action": "upsert",
+                "created": created,
+                "updated": cr.update_time,
+                "attrs": {
+                    "ancestors": ancestors,
+                    "parent": cr.resource.parent.lstrip("//"),
+                    "location": cr.resource.location,
+                },
             },
-        },
-    }
-    caizen_asset = CaizenAssetV1(**cav1)
+        }
+        caizen_asset = CaizenAssetV1(**cav1)
 
-    return caizen_asset
+        # Enrich the asset with custom attributes based on the asset type
+        asset_model = globals().get(f"{cr.asset_type}_ASSET_V{str(asset_version)}")
+        if asset_model:
+            caizen_asset = asset_model.setattrs(caizen_asset, cr)
+
+        return caizen_asset
+
+
+class GCP_STORAGE_BUCKET_ASSET_V1:
+    def setattrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
+        """
+        Set the attributes for a GCP Storage Bucket asset.
+
+        Args:
+            cav: The CAIZEN asset.
+            cr: The CAI record.
+
+        Returns:
+            The CAIZEN asset with attributes set.
+        """
+        cav1.asset.created = datetime.fromisoformat(cr.resource.data.get("timeCreated"))
+        cav1.asset.attrs["storage_class"] = cr.resource.data.get(
+            "storageClass", "STANDARD"
+        )  # "STANDARD", "NEARLINE", "COLDLINE", "ARCHIVE"
+        cav1.asset.attrs["iam"] = {
+            "bucket_policy_only": cr.resource.data.get("iamConfiguration", {})
+            .get("bucketPolicyOnly", {})
+            .get("enabled", False),  # True, False
+            "uniform_bucket_level_access": cr.resource.data.get("iamConfiguration", {})
+            .get("uniformBucketLevelAccess", {})
+            .get("enabled", False),  # True, False
+            "block_public_access": cr.resource.data.get("iamConfiguration", {}).get(
+                "publicAccessPrevention", "unspecified"
+            ),  # "enforced", "unspecified"
+        }
+        cav1.asset.attrs["cors"] = cr.resource.data.get("cors", [])
+        cav1.asset.attrs["labels"] = cr.resource.data.get("labels", {})
+        cav1.asset.attrs["versioning"] = cr.resource.data.get("versioning", {}).get(
+            "enabled", False
+        )
+
+        return cav1
+
+
+class GCP_PUBSUB_TOPIC_ASSET_V1:
+    def setattrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
+        """
+        Set the attributes for a GCP PUBSUB TOPIC asset.
+
+        Args:
+            cav: The CAIZEN asset.
+            cr: The CAI record.
+
+        Returns:
+            The CAIZEN asset with attributes set.
+        """
+        return cav1
