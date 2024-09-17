@@ -6,8 +6,8 @@ import functions_framework
 import google.cloud.logging
 from flask import Flask
 from flask.wrappers import Request, Response
+from src.message import extract_bucket_and_object_id, validate_request
 from src.schemas import NotificationResponse
-from src.validation import extract_bucket_and_object_id, validate_request
 
 # add the parent directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))

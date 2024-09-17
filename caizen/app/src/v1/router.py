@@ -29,7 +29,6 @@ async def process_asset(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
         )
         await getattr(loader, asset_model.action)()
     except Exception as e:
-        breakpoint()
         raise HTTPException(status_code=400, detail=f"Failed to process asset: {e}")
 
     return ProcessedAsset(name=asset_model.name, action=asset_model.action)

@@ -6,8 +6,8 @@ from typing import Generator
 import requests
 from google.cloud import storage
 from pydantic import ValidationError
-from src.gcp.transform import GCP_ASSET
 from src.schemas import CaiRecord
+from src.transform import GCP_ASSET
 
 
 def stream_gcs_file(bucket_id: str, object_id: str) -> Generator[str, None, None]:
@@ -51,7 +51,8 @@ def validate_cai_record(data: dict):
 
 def transform_cai_record(cai_record):
     try:
-        return GCP_ASSET.transform(cai_record)
+        asset = GCP_ASSET.transform(cai_record)
+        return asset
     except ValueError as e:
         logging.error(f"Error transforming CAI record: {e}")
         raise Exception(f"Error transforming CAI record: {e}")
