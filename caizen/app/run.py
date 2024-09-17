@@ -20,9 +20,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async with AsyncGraphDatabase.driver(URI, auth=AUTH) as driver:
         app.db = driver
         yield
-        # async with driver.session(database="") as session:
-        #     app.db = session
-        #     yield
 
 
 app = FastAPI(

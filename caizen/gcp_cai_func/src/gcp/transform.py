@@ -1,5 +1,9 @@
 from datetime import datetime, timezone
 
+from common.v1.providers.gcp import (
+    GCP_PUBSUB_TOPIC_ASSET_V1,
+    GCP_STORAGE_BUCKET_ASSET_V1,
+)
 from common.v1.schemas import CaizenAssetV1
 from src.schemas import CaiRecord
 
@@ -45,15 +49,15 @@ class GCP_ASSET:
         caizen_asset = CaizenAssetV1(**cav1)
 
         # Enrich the asset with custom attributes based on the asset type
-        asset_model = globals().get(f"{cr.asset_type}_ASSET_V{str(asset_version)}")
+        asset_model = globals().get(f"{cr.asset_type}_V{str(asset_version)}")
         if asset_model:
-            caizen_asset = asset_model.setattrs(caizen_asset, cr)
+            caizen_asset = asset_model.enrich_attrs(caizen_asset, cr)
 
         return caizen_asset
 
 
-class GCP_STORAGE_BUCKET_ASSET_V1:
-    def setattrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
+class GCP_STORAGE_BUCKET_V1:
+    def enrich_attrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
         """
         Set the attributes for a GCP Storage Bucket asset.
 
@@ -84,12 +88,16 @@ class GCP_STORAGE_BUCKET_ASSET_V1:
         cav1.asset.attrs["versioning"] = cr.resource.data.get("versioning", {}).get(
             "enabled", False
         )
+        try:
+            GCP_STORAGE_BUCKET_ASSET_V1(**cav1.asset.model_dump())
+        except ValueError as e:
+            raise ValueError(f"Error enriching GCP Storage Bucket asset: {e}")
 
         return cav1
 
 
-class GCP_PUBSUB_TOPIC_ASSET_V1:
-    def setattrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
+class GCP_PUBSUB_TOPIC_V1:
+    def enrich_attrs(cav1: CaizenAssetV1, cr: CaiRecord) -> CaizenAssetV1:
         """
         Set the attributes for a GCP PUBSUB TOPIC asset.
 
@@ -100,4 +108,9 @@ class GCP_PUBSUB_TOPIC_ASSET_V1:
         Returns:
             The CAIZEN asset with attributes set.
         """
+        try:
+            GCP_PUBSUB_TOPIC_ASSET_V1(**cav1.asset.model_dump())
+        except ValueError as e:
+            raise ValueError(f"Error enriching GCP Storage Bucket asset: {e}")
+
         return cav1

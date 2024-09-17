@@ -1,5 +1,6 @@
 import os
 
+from common.v1.providers import *  # noqa
 from common.v1.schemas import CaizenAssetV1, ProcessedAsset
 from fastapi import APIRouter, HTTPException, Request, status
 from src.v1.providers import *  # noqa
@@ -21,9 +22,14 @@ async def process_asset(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
     db = req.app.db
     try:
         asset_model = await find_asset_processor(input)
-        # Call the upsert() or delete() method on the asset model
-        await getattr(asset_model, asset_model.action)(db=db)
+        # create instance of class f"{type(asset_model).__name__}_LOADER"
+        # and call action (upsert or delete) method
+        loader = globals().get(f"{type(asset_model).__name__}_LOADER")(
+            db=db, asset_model=asset_model
+        )
+        await getattr(loader, asset_model.action)()
     except Exception as e:
+        breakpoint()
         raise HTTPException(status_code=400, detail=f"Failed to process asset: {e}")
 
     return ProcessedAsset(name=asset_model.name, action=asset_model.action)

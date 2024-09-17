@@ -1,30 +1,23 @@
-from typing import List
-
-from common.v1.schemas import CaizenAssetFormatV1
+from common.v1.schemas import CaizenAssetV1
 from neo4j import AsyncGraphDatabase
-from pydantic import BaseModel
 
 
-class GCP_PUBSUB_TOPIC_ASSET_ATTRS_V1(BaseModel):
-    ancestors: List[str]
-    parent: str
-    location: str
+class GCP_PUBSUB_TOPIC_ASSET_V1_LOADER:
+    def __init__(self, asset_model: CaizenAssetV1, db: AsyncGraphDatabase) -> None:
+        self.asset = asset_model
+        self.db = db
 
-
-class GCP_PUBSUB_TOPIC_ASSET_V1(CaizenAssetFormatV1):
-    attrs: GCP_PUBSUB_TOPIC_ASSET_ATTRS_V1
-
-    async def upsert(self, db: AsyncGraphDatabase) -> None:
-        session = db.session()
+    async def upsert(self) -> None:
+        session = self.db.session()
         async with await session.begin_transaction() as tx:
             result = await tx.run("MATCH (n) RETURN count(n) as count")
             data = await result.single()
             count = data[0]
         print(f"{count} nodes")
         print(
-            f"PUBSUB_TOPIC Upserting {self.name} of type {self.type}"
-            f" with {self.attrs}"
+            f"PUBSUB_TOPIC Upserting {self.asset.name} of type {self.asset.type}"
+            f" with {self.asset.attrs}"
         )
 
-    async def delete(self, db: AsyncGraphDatabase) -> None:
-        print(f"PUBSUB_TOPIC Deleting {self.name} of type {self.type}")
+    async def delete(self) -> None:
+        print(f"PUBSUB_TOPIC Deleting {self.asset.name} of type {self.asset.type}")
