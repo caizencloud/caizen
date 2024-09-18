@@ -10,8 +10,8 @@ class CaiResource(BaseModel):
     data: Optional[dict] = None
     discovery_document_uri: HttpUrl
     discovery_name: str
-    location: str
-    parent: str
+    location: Optional[str] = "global"
+    parent: Optional[str] = None
     version: str
 
 

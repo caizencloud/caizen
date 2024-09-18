@@ -4,10 +4,9 @@ from common.v1.schemas import CaizenAssetV1
 from src.v1.providers import *  # noqa
 
 
-def parse_ancestors(ancestors_list):
+def parse_ancestors(asset_name, ancestors_list):
     """
     Transform the ancestors list by prepending 'cloudresourcemanager.googleapis.com/'
-    to each ancestor that does not start with 'projects/'.
 
     Args:
         ancestors_list: List of ancestor strings.
@@ -15,11 +14,13 @@ def parse_ancestors(ancestors_list):
     Returns:
         List of transformed ancestor strings.
     """
-    return [
-        "cloudresourcemanager.googleapis.com/" + a
-        for a in ancestors_list
-        if not a.startswith("projects/")
-    ]
+    ancestors = ["cloudresourcemanager.googleapis.com/" + a for a in ancestors_list]
+
+    # Remove self from the ancestors list
+    if asset_name in ancestors:
+        ancestors.remove(asset_name)
+
+    return ancestors
 
 
 class GCP_ASSET:
@@ -38,7 +39,7 @@ class GCP_ASSET:
         if created > cr.update_time:
             created = cr.update_time
 
-        ancestors = parse_ancestors(cr.ancestors)
+        ancestors = parse_ancestors(cr.name, cr.ancestors)
 
         # Create the asset dictionary
         ca = {
@@ -49,7 +50,7 @@ class GCP_ASSET:
             "updated": cr.update_time,
             "attrs": {
                 "ancestors": ancestors,
-                "parent": cr.resource.parent.lstrip("//"),
+                "parent": str(cr.resource.parent).lstrip("//"),
                 "location": cr.resource.location,
             },
         }

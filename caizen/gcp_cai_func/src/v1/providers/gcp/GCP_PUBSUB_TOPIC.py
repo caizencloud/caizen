@@ -15,6 +15,8 @@ class GCP_PUBSUB_TOPIC_V1:
         Returns:
             The CAIZEN asset with attributes set.
         """
+        ca["attrs"]["display_name"] = cr.name.split("/")[-1]
+
         try:
             GCP_PUBSUB_TOPIC_ASSET_V1(**ca)
         except ValueError as e:

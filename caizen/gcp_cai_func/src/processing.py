@@ -60,6 +60,10 @@ def transform_cai_record(cai_record):
 
 def send_to_caizen_api(api_url: str, headers: dict, caizen_asset_json: dict):
     try:
+        # import random
+        # import time
+
+        # time.sleep(random.randint(1, 5))
         response = requests.post(api_url, headers=headers, json=caizen_asset_json)
         response.raise_for_status()
     except requests.RequestException as e:

@@ -3,7 +3,7 @@ from neo4j import GraphDatabase
 from src.v1.providers.gcp.GCP_DEFAULT import GCP_DEFAULT_ASSET_V1_LOADER
 
 
-class GCP_STORAGE_BUCKET_ASSET_V1_LOADER(GCP_DEFAULT_ASSET_V1_LOADER):
+class GCP_CLOUDRESOURCEMANAGER_PROJECT_ASSET_V1_LOADER(GCP_DEFAULT_ASSET_V1_LOADER):
     def __init__(self, asset_model: CaizenAssetV1, db: GraphDatabase) -> None:
         super().__init__(asset_model, db)
 
@@ -11,4 +11,6 @@ class GCP_STORAGE_BUCKET_ASSET_V1_LOADER(GCP_DEFAULT_ASSET_V1_LOADER):
         self._upsert()
 
     def delete(self) -> None:
-        print(f"BUCKET Deleting {self.asset.name} of type {self.asset.type}")
+        print(
+            f"CLOUDRESOURCEMANAGER_PROJECT Deleting {self.asset.name} of type {self.asset.type}"
+        )

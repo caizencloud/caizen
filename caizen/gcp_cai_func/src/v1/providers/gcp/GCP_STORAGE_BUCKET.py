@@ -37,6 +37,7 @@ class GCP_STORAGE_BUCKET_V1:
         ca["attrs"]["versioning"] = cr.resource.data.get("versioning", {}).get(
             "enabled", False
         )
+        ca["attrs"]["display_name"] = cr.resource.data.get("name", None)
 
         try:
             GCP_STORAGE_BUCKET_ASSET_V1(**ca)
