@@ -1,9 +1,8 @@
-import os
-
 from common.v1.providers import *  # noqa
 from common.v1.schemas import CaizenAssetV1, ProcessedAsset
 from fastapi import APIRouter, HTTPException, Request, status
 from src.v1.providers import *  # noqa
+from src.v1.utils.asset_helpers import find_asset_processor
 
 v1_router = APIRouter()
 
@@ -14,89 +13,61 @@ v1_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     response_model=ProcessedAsset,
 )
-def process_asset(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
+def process_asset_upsert(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
     """
-    Find an asset processor and call the upsert or delete method on the asset
-    model to upsert or delete the asset in the database.
+    Find an asset processor and call the upsert method on the asset
+    model to upsert the asset into the database.
+
+    Args:
+        input: The asset model to process.
+
+    Returns:
+        The processed asset JSON response.
     """
-    db = req.app.db
     try:
-        asset_model = find_asset_processor(input)
-        # create instance of class f"{type(asset_model).__name__}_LOADER"
-        # and call action (upsert or delete) method
-        loader = globals().get(f"{type(asset_model).__name__}_LOADER")(
-            db=db, asset_model=asset_model
-        )
-        getattr(loader, asset_model.action)()
+        # Find the asset processor to use
+        asset_processor = find_asset_processor(input)
+        # Process the asset into a pydantic model
+        asset_model = asset_processor(**input.asset.model_dump())
+        # Get the db manager class for the asset model
+        loader_cls = globals().get(f"{type(asset_model).__name__}_MANAGER")
+        # and call upsert()
+        loader_cls(db=req.app.db, asset_model=asset_model).upsert()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process asset: {e}")
+        print(f"Failed to upsert asset: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to upsert asset: {e}")
 
     return ProcessedAsset(name=asset_model.name, action=asset_model.action)
 
 
-def find_asset_processor(asset_model) -> dict:
+# DELETE /v1/asset
+@v1_router.delete(
+    "/asset",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ProcessedAsset,
+)
+def process_asset_delete(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
     """
-    Find an appropriate asset processor via its asset_type for the asset model.
-    """
-    parsed_model = dict()
-    asset_record = asset_model.model_dump()
-    asset = asset_record.get("asset")
-    asset_type = asset.get("type")
-    asset_version = asset_record.get("version")
+    Find an asset processor and call the delete method on the asset
+    model to delete the asset from the database.
 
-    # Match a provider's named processor by asset_type and asset_version
-    # If no exact match is found, try the default asset processor
+    Args:
+        input: The asset model to process.
+
+    Returns:
+        The processed asset JSON response.
+    """
     try:
-        model_name = lookup_named_asset_processor(asset_type, asset_version)
-        if model_name is not None:
-            parsed_model = model_name(**asset)
-        else:
-            default_model_name = lookup_default_asset_processor(asset_record)
-            # No default model matches the asset_type
-            if default_model_name is None:
-                raise HTTPException(
-                    status_code=400, detail="Default asset processor not found"
-                )
-            parsed_model = default_model_name(**asset)
+        # Find the asset processor to use
+        asset_processor = find_asset_processor(input)
+        # Process the asset into a pydantic model
+        asset_model = asset_processor(**input.asset.model_dump())
+        # Get the db manager class for the asset model
+        loader_cls = globals().get(f"{type(asset_model).__name__}_MANAGER")
+        # and call delete()
+        loader_cls(db=req.app.db, asset_model=asset_model).delete()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Processing error: {e}")
+        print(f"Failed to delete asset: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to delete asset: {e}")
 
-    return parsed_model
-
-
-def lookup_named_asset_processor(asset_type, asset_version) -> dict | None:
-    """Helper function to find a named asset processor."""
-    model = globals().get(f"{asset_type}_ASSET_V{str(asset_version)}")
-
-    return model
-
-
-def lookup_default_asset_processor(asset_record) -> dict | None:
-    """
-    Find the default asset processor for the asset model or throw an error.
-    """
-    asset_version = asset_record.get("version")
-    asset_type = asset_record.get("asset").get("type")
-
-    subdirs = list_of_provider_subdirs()
-
-    # See if the asset_type matches any provider subdir
-    # and set the default model name to its default asset processor
-    default_model_name = None
-    for dir in subdirs:
-        if asset_type.lower().startswith(f"{dir.lower()}_"):
-            default_model_name = globals().get(
-                f"{dir.upper()}_DEFAULT_ASSET_V{str(asset_version)}"
-            )
-            break
-
-    return default_model_name
-
-
-def list_of_provider_subdirs():
-    """Get list of providers via the names of the subdirectories."""
-    return [
-        dir.upper()
-        for dir in os.listdir(os.path.join(os.path.dirname(__file__), "providers"))
-        if not dir.startswith("_")
-    ]
+    return ProcessedAsset(name=asset_model.name, action=asset_model.action)

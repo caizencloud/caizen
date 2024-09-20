@@ -51,7 +51,7 @@ def validate_cai_record(data: dict):
 
 def transform_cai_record(cai_record):
     try:
-        asset = GCP_ASSET.transform(cai_record)
+        asset = GCP_ASSET().transform(cai_record)
         return asset
     except ValueError as e:
         logging.error(f"Error transforming CAI record: {e}")

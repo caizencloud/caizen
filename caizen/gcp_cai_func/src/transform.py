@@ -4,27 +4,8 @@ from common.v1.schemas import CaizenAssetV1
 from src.v1.providers import *  # noqa
 
 
-def parse_ancestors(asset_name, ancestors_list):
-    """
-    Transform the ancestors list by prepending 'cloudresourcemanager.googleapis.com/'
-
-    Args:
-        ancestors_list: List of ancestor strings.
-
-    Returns:
-        List of transformed ancestor strings.
-    """
-    ancestors = ["cloudresourcemanager.googleapis.com/" + a for a in ancestors_list]
-
-    # Remove self from the ancestors list
-    if asset_name in ancestors:
-        ancestors.remove(asset_name)
-
-    return ancestors
-
-
 class GCP_ASSET:
-    def transform(cr) -> CaizenAssetV1:
+    def transform(self, cr) -> CaizenAssetV1:
         """
         Transform a CAI record into a CAIZEN asset.
 
@@ -34,12 +15,9 @@ class GCP_ASSET:
         Returns:
             The CAIZEN asset as a dictionary.
         """
-        # Use the earliest time as the created time
-        created = datetime.now(timezone.utc)
-        if created > cr.update_time:
-            created = cr.update_time
 
-        ancestors = parse_ancestors(cr.name, cr.ancestors)
+        created = self._get_created_time(cr)
+        ancestors = self._parse_ancestors(cr.name, cr.ancestors)
 
         # Create the asset dictionary
         ca = {
@@ -65,3 +43,39 @@ class GCP_ASSET:
         caizen_asset = CaizenAssetV1(**cav)
 
         return caizen_asset
+
+    def _parse_ancestors(self, asset_name, ancestors_list):
+        """
+        Transform the ancestors list by prepending 'cloudresourcemanager.googleapis.com/'
+
+        Args:
+            ancestors_list: List of ancestor strings.
+
+        Returns:
+            List of transformed ancestor strings.
+        """
+        ancestors = ["cloudresourcemanager.googleapis.com/" + a for a in ancestors_list]
+
+        # Remove self from the ancestors list
+        if asset_name in ancestors:
+            ancestors.remove(asset_name)
+
+        return ancestors
+
+    def _get_created_time(self, cr):
+        """
+        Get the created time of the asset. If not found, return the epoch datetime.
+
+        Args:
+            cr: The CAI record.
+
+        Returns:
+            created: datetime object of the created time.
+
+        """
+        created = datetime.fromtimestamp(0, tz=timezone.utc)
+        ct = cr.resource.data.get("createTime") or cr.resource.data.get("creationTime")
+        if ct:
+            created = datetime.fromisoformat(ct)
+
+        return created
