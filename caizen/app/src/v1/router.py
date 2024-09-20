@@ -43,7 +43,7 @@ def process_asset_upsert(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
 # DELETE /v1/asset
 @v1_router.delete(
     "/asset",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     response_model=ProcessedAsset,
 )
 def process_asset_delete(req: Request, input: CaizenAssetV1) -> ProcessedAsset:

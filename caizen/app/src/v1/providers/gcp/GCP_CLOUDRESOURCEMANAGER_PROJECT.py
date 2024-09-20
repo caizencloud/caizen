@@ -7,9 +7,6 @@ class GCP_CLOUDRESOURCEMANAGER_PROJECT_ASSET_V1_MANAGER(GCP_DEFAULT_ASSET_V1_MAN
     def __init__(self, asset_model: CaizenAssetV1, db: GraphDatabase) -> None:
         super().__init__(asset_model, db)
 
-    # def upsert(self) -> None:
-    #     self._upsert()
-
     def delete(self) -> None:
         print(
             f"CLOUDRESOURCEMANAGER_PROJECT Deleting {self.asset.name} of type {self.asset.type}"
