@@ -18,7 +18,8 @@ main:
           - output_bucket: $${args.output_bucket}
           - output_prefix: $${args.output_prefix}
           - content_type: $${args.content_type}
-          - export_prefix: $${args.output_prefix +"/"+ args.target_type +"s/"+ args.target_id +"/"+ args.content_type}
+          - dt: $${time.format(sys.now(),"UTC")}
+          - export_prefix: $${args.output_prefix +"/"+ dt +"/"+ args.target_type +"s/"+ args.target_id +"/"+ args.content_type}
           - retry_count: 0
           - max_retries: $${args.max_retries}
           - sleep: $${args.sleep_seconds}
@@ -31,6 +32,7 @@ main:
                 output_bucket: "$${output_bucket}"
                 export_prefix: "$${export_prefix}"
                 content_type: "$${content_type}"
+                dt: "$${dt}"
             result: export_result
         except:
             as: e
@@ -43,6 +45,7 @@ main:
                     output_bucket: "$${output_bucket}"
                     export_prefix: "$${export_prefix}"
                     content_type: "$${content_type}"
+                    dt: "$${dt}"
                 result: export_result
     - wait_for_operation_status:
         call: sys.sleep
@@ -74,7 +77,7 @@ main:
         return: $${operation_status.body.response.outputResult}
 
 execute_export:
-    params: [target_type, target_id, output_bucket, export_prefix, content_type]
+    params: [target_type, target_id, output_bucket, export_prefix, content_type, dt]
     steps:
     - export_assets:
         call: http.post
@@ -88,6 +91,7 @@ execute_export:
                     gcsDestination:
                         uri_prefix: $${"gs://"+ output_bucket +"/"+ export_prefix}
                 contentType: "$${text.to_upper(content_type)}"
+                readTime: "$${dt}"
         result: export_result
     - return:
         return: $${export_result}
