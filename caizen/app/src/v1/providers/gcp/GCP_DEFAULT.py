@@ -12,10 +12,11 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
         self.db = db
 
     def upsert(self) -> None:
-        self._write_with_retries(self._upsert_node, asset=self.asset)
+        return self._write_with_retries(self._upsert_node, asset=self.asset)
 
     def delete(self) -> None:
         print(f"DEFAULT Deleting {self.asset.name} of type {self.asset.type}")
+        return self._write_with_retries(self._delete_node, asset=self.asset)
 
     def _write_with_retries(self, db_action_func, **kwargs) -> None:
         max_retries = 50
@@ -27,9 +28,9 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
                 try:
                     # session.execute_write(action, **kwargs)
                     with session.begin_transaction() as tx:
-                        db_action_func(tx, **kwargs)
+                        result = db_action_func(tx, **kwargs)
                         tx.commit()
-                        break
+                        return result
                 except TransientError:
                     jitter = random.uniform(0, jitter) * initial_wait_time
                     wait_time = initial_wait_time * (backoff_factor**attempt) + jitter
@@ -38,8 +39,47 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
                     )
                     time.sleep(wait_time)
                 except Exception as e:
-                    print(f"Failed to execute transaction: {e}")
                     raise e
+
+    def _delete_unattached_nodes(self, tx) -> None:
+        """
+        Delete all nodes that are not attached to any parent
+
+        Args:
+            tx (neo4j.Transaction): Neo4j transaction object
+
+        Returns:
+            None
+        """
+        tx.run("MATCH (n) WHERE NOT EXISTS((n)--()) DELETE n;")
+        print("Unattached nodes deleted")
+
+        return None
+
+    def _delete_node(self, tx, asset) -> str:
+        """
+        Delete the asset node
+
+        Args:
+            tx (neo4j.Transaction): Neo4j transaction object
+            asset (CaizenAssetV1): Asset object
+
+        Returns:
+            str: status message
+        """
+        node_name = str(asset.name)
+        node_label = str(asset.type)
+        query = f"""MATCH (n:{node_label} {{ name: $node_name }}) DETACH DELETE n RETURN 1"""
+        try:
+            result = tx.run(query, node_label=node_label, node_name=node_name)
+            if len(result.data()) > 0:
+                print(f"Asset: {node_name} type: {node_label} deleted")
+                return "Asset deleted"
+            else:
+                print(f"Asset: {node_name} type: {node_label} not found. Skipping")
+                return "Asset not found"
+        except Exception as e:
+            raise Exception(f"Failed to delete node: {e}")
 
     def _upsert_node(self, tx, asset) -> None:
         parent, parent_rel = self._get_parent_details(asset)
@@ -57,10 +97,10 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
          n.display_name = $display_name,
          n.attrs = $node_attrs
         ON MATCH SET
-         n.updated_ts = $updated,
-         n.updated = $updated_display,
-         n.display_name = $display_name,
-         n.attrs = $node_attrs
+         n.updated_ts = CASE WHEN n.updated_ts < $updated THEN $updated ELSE n.updated_ts END,
+         n.updated = CASE WHEN n.updated_ts < $updated THEN $updated_display ELSE n.updated END,
+         n.display_name = CASE WHEN n.updated_ts < $updated THEN $display_name ELSE n.display_name END,
+         n.attrs = CASE WHEN n.updated_ts < $updated THEN $node_attrs ELSE n.attrs END
         {parent_rel}
         RETURN n
         """
@@ -77,10 +117,30 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
         )
         print(f"Node {asset.name} of type {asset.type} upserted")
 
+        return None
+
     def _format_3339(self, dt) -> str:
+        """
+        Format the datetime object to RFC3339 format
+
+        Args:
+            dt: datetime object
+
+        Returns:
+            str: datetime in RFC3339 format
+        """
         return dt.replace(microsecond=0).isoformat() + "Z"
 
     def _get_parent_label(self, parent):
+        """
+        Get the parent label of the asset
+
+        Args:
+            parent (str): parent name
+
+        Returns:
+            str: parent label
+        """
         parent_label = None
         if parent.startswith("cloudresourcemanager.googleapis.com/projects/"):
             parent_label = "GCP_CLOUDRESOURCEMANAGER_PROJECT"
@@ -111,7 +171,11 @@ class GCP_DEFAULT_ASSET_V1_MANAGER:
             parent_label = self._get_parent_label(parent)
             parent_rel = f"""
             MERGE (p:{parent_label} {{ name: $parent_name }})
-            MERGE (p)-[:HAS_CHILD]->(n)
+            MERGE (p)-[r:HAS_CHILD]->(n)
+            ON CREATE SET r.created_ts = $updated, r.created = $updated_display
+            ON MATCH SET
+             r.updated_ts = CASE WHEN r.updated_ts < $updated THEN $updated ELSE r.updated_ts END,
+             r.updated = CASE WHEN r.updated_ts < $updated THEN $updated_display ELSE r.updated END
             """
 
         return parent, parent_rel

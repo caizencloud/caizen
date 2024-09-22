@@ -1,17 +1,13 @@
 import logging
 import os
-import sys
 
 import functions_framework
 import google.cloud.logging
 from flask import Flask
 from flask.wrappers import Request, Response
 from src.message import extract_bucket_and_object_id, validate_request
-from src.schemas import NotificationResponse
-
-# add the parent directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from src.processing import process_gcs_file  # noqa
+from src.schemas import NotificationResponse
 
 app = Flask(__name__)
 

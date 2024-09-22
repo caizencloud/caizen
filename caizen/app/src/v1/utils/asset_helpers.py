@@ -52,6 +52,6 @@ def list_of_provider_subdirs() -> list:
     """
     return [
         dir.upper()
-        for dir in os.listdir(os.path.join(os.path.dirname(__file__), "providers"))
+        for dir in os.listdir(os.path.join(os.path.dirname(__file__), "../providers"))
         if not dir.startswith("_")
     ]

@@ -23,7 +23,6 @@ class GCP_ASSET:
         ca = {
             "name": cr.name,
             "type": cr.asset_type,
-            "action": "upsert",
             "created": created,
             "updated": cr.update_time,
             "attrs": {

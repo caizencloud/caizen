@@ -11,3 +11,7 @@ class GCP_CLOUDRESOURCEMANAGER_FOLDER_ASSET_V1_MANAGER(GCP_DEFAULT_ASSET_V1_MANA
         print(
             f"CLOUDRESOURCEMANAGER_FOLDER Deleting {self.asset.name} of type {self.asset.type}"
         )
+        message = self._write_with_retries(self._delete_node, asset=self.asset)
+        self._write_with_retries(self._delete_unattached_nodes)
+
+        return message

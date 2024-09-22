@@ -1,5 +1,5 @@
 from common.v1.providers import *  # noqa
-from common.v1.schemas import CaizenAssetV1, ProcessedAsset
+from common.v1.schemas import CaizenAssetDeleteV1, CaizenAssetV1, ProcessedAsset
 from fastapi import APIRouter, HTTPException, Request, status
 from src.v1.providers import *  # noqa
 from src.v1.utils.asset_helpers import find_asset_processor
@@ -37,7 +37,7 @@ def process_asset_upsert(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
         print(f"Failed to upsert asset: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to upsert asset: {e}")
 
-    return ProcessedAsset(name=asset_model.name, action=asset_model.action)
+    return ProcessedAsset(name=asset_model.name, action="upsert")
 
 
 # DELETE /v1/asset
@@ -46,7 +46,7 @@ def process_asset_upsert(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
     status_code=status.HTTP_200_OK,
     response_model=ProcessedAsset,
 )
-def process_asset_delete(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
+def process_asset_delete(req: Request, input: CaizenAssetDeleteV1) -> ProcessedAsset:
     """
     Find an asset processor and call the delete method on the asset
     model to delete the asset from the database.
@@ -60,14 +60,13 @@ def process_asset_delete(req: Request, input: CaizenAssetV1) -> ProcessedAsset:
     try:
         # Find the asset processor to use
         asset_processor = find_asset_processor(input)
-        # Process the asset into a pydantic model
-        asset_model = asset_processor(**input.asset.model_dump())
+        asset = input.asset
         # Get the db manager class for the asset model
-        loader_cls = globals().get(f"{type(asset_model).__name__}_MANAGER")
+        manager_cls = globals().get(f"{asset_processor.__name__}_MANAGER")
         # and call delete()
-        loader_cls(db=req.app.db, asset_model=asset_model).delete()
+        msg = manager_cls(db=req.app.db, asset_model=asset).delete()
     except Exception as e:
         print(f"Failed to delete asset: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to delete asset: {e}")
 
-    return ProcessedAsset(name=asset_model.name, action=asset_model.action)
+    return ProcessedAsset(name=asset.name, action="delete", message=msg)

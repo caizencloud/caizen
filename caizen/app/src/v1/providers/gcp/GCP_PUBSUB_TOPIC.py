@@ -7,5 +7,5 @@ class GCP_PUBSUB_TOPIC_ASSET_V1_MANAGER(GCP_DEFAULT_ASSET_V1_MANAGER):
     def __init__(self, asset_model: CaizenAssetV1, db: GraphDatabase) -> None:
         super().__init__(asset_model, db)
 
-    def delete(self) -> None:
-        print(f"PUBSUB_TOPIC Deleting {self.asset.name} of type {self.asset.type}")
+    # def delete(self) -> None:
+    #     print(f"PUBSUB_TOPIC Deleting {self.asset.name} of type {self.asset.type}")
