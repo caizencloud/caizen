@@ -55,8 +55,6 @@ extra:
   social:
     - icon: fontawesome/brands/github-alt
       link: https://github.com/caizencloud/caizen
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/bradgeesaman
     - icon: fontawesome/brands/linkedin
       link: https://linkedin.com/in/bradgeesaman
 
