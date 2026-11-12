@@ -1,1 +1,0 @@
-# GCP Cloud Asset Inventory
