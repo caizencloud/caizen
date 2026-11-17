@@ -1,4 +1,11 @@
 .DS_Store
-__pycache__
-.terraform
-.terraform.lock.hcl
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# hugo
+docs/public/
+docs/resources/
+.hugo_build.lock
