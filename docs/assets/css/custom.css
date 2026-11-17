@@ -1,0 +1,17 @@
+/* Caizen brand colors, sampled from the logo tree. */
+:root {
+  --caizen-purple: #483a71;
+  --caizen-grey: #6f757c;
+  --caizen-black: #202225;
+  --caizen-white: #ffffff;
+
+  /* Hextra primary = caizen purple (#483a71 = hsl(255 32% 33.5%)). */
+  --primary-hue: 255deg;
+  --primary-saturation: 32%;
+  --primary-lightness: 33.5%;
+}
+
+/* The brand purple is too dark to read on a dark background. Same hue, lighter. */
+html.dark {
+  --primary-lightness: 68%;
+}

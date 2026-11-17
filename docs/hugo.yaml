@@ -1,0 +1,91 @@
+baseURL: https://caizen.cloud/
+title: Caizen
+
+enableRobotsTXT: true
+
+module:
+  hugoVersion:
+    extended: true
+    min: "0.148.1"
+  imports:
+    - path: github.com/imfing/hextra
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+    extensions:
+      passthrough:
+        enable: true
+        delimiters:
+          block: [['\[', '\]'], ['$$', '$$']]
+          inline: [['\(', '\)']]
+  highlight:
+    noClasses: false
+
+outputs:
+  home: [HTML]
+  page: [HTML]
+  section: [HTML, RSS]
+
+menu:
+  main:
+    - name: Docs
+      pageRef: /docs
+      weight: 0
+    - name: Search
+      weight: 1
+      params:
+        type: search
+    - name: Theme Toggle
+      weight: 2
+      params:
+        type: theme-toggle
+    - name: LinkedIn
+      weight: 3
+      url: https://linkedin.com/in/bradgeesaman
+      params:
+        icon: linkedin
+    - name: GitHub
+      weight: 4
+      url: https://github.com/caizencloud/caizen
+      params:
+        icon: github
+
+params:
+  description: Harness the security superpowers of your cloud asset inventory.
+
+  navbar:
+    displayTitle: true
+    displayLogo: true
+    logo:
+      path: img/caizen-logo-dark.png
+      dark: img/caizen-logo-dark.png
+      width: 40
+      height: 32
+    width: wide
+
+  theme:
+    default: system
+    displayToggle: true
+
+  footer:
+    enable: true
+    displayCopyright: false
+    displayPoweredBy: true
+    width: wide
+
+  search:
+    enable: true
+    type: flexsearch
+    flexsearch:
+      index: content
+      tokenize: forward
+
+  highlight:
+    copy:
+      enable: true
+      display: hover
+
+  page:
+    width: full
