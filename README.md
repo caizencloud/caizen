@@ -18,11 +18,10 @@ Caizen is an agent-first attack path analysis system for cloud environments. It 
 
 | Directory | Contents |
 |---|---|
-| `app/` | The Caizen service, written in Go. `cmd/` holds the entry point, `internal/` holds the API, data loading, scoring, and agent dispatch packages, and `e2e/` holds the end-to-end tests and their test data. |
-| `packs/` | One pack per system, such as `core`, `gcp`, `github`, and `oci`. Each pack holds its SQL rules, feed definitions, and collectors. |
-| `terraform/` | Infrastructure code. `platform/` is the platform module, `envs/` holds the deployable environments, and `test-org/` builds the test organization that produces the end-to-end test data. |
-| `docs/` | The documentation site, built with Hugo and the Hextra theme and published to [caizen.cloud](https://caizen.cloud). |
-| `.github/workflows/` | CI workflows. |
+| `app/` | The Caizen service, written in Go, and its end-to-end tests |
+| `packs/` | Rules, feed definitions, and collectors, grouped by the system they talk to (GCP, GitHub, container registries) |
+| `terraform/` | Terraform for the platform, its environments, and the test org used as reference infrastructure to build and test collectors |
+| `docs/` | The docs site at [caizen.cloud](https://caizen.cloud), built with Hugo |
 
 ## Background
 
