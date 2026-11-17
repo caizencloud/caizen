@@ -3,17 +3,17 @@ title: Why Caizen
 weight: 2
 ---
 
-Caizen is an agent-first way to run a security program. Its graph is built for agents to query and act on.
+Caizen drives agent-first security analysis with a context graph built by and for agents to act on. The usual tool-oriented approach, where each security tool reports its own findings and people connect them by hand, is inefficient and wasteful. It has proven to fall short in large environments, especially against agent-driven attacks.
 
 ## The problem
 
 Security tools do not have the context needed to support decisions. Each tool knows only its own findings and nothing about the findings of other tools. Many tools also work from snapshots that go out of date.
 
-To act on a finding, a person looks at it in isolation and then finds the business context by hand: who owns the resource, how critical it is, which environment it runs in, and which regulatory requirements apply. This work is slow, and almost every security team does it.
+To act on a finding, a person looks at it in isolation and then finds the business context by hand: who owns the resource, how critical it is, which environment it runs in, and which regulatory requirements apply. This work is slow, and almost every security team struggles with this in some form.
 
 ## The approach
 
-Caizen gathers that context ahead of time into one graph and keeps it accurate. Agents query the graph to decide which fix to apply first and why, and then act on that decision. Because the data is modeled as a graph, an agent needs only a few queries to get all of the context for a decision.
+Most security workflows start with a finding and then go looking for the details around it. Caizen works the other way around. It gathers all security-relevant context ahead of time, and agents keep the graph in sync with the environment. When an agent has to decide which fix to apply first, a few graph queries give it the ownership, environment, and exposure details it needs to choose and act.
 
 Keeping the graph current and re-checking it against reality is tedious, and the amount of work grows quickly with the size of the environment. Targeted agents do this work as well. They keep the graph up to date and keep an audit trail of every check and change.
 
