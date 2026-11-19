@@ -7,7 +7,7 @@ Terraform module that downloads the CISA Known Exploited Vulnerabilities (KEV) c
 Workflows limits one string to 256 KB and all variables in an execution to 512 KB, and both files are larger. For each file, the Workflow:
 
 1. Resolves redirects. The EPSS URL redirects to the dated daily file, and the stored object takes that file's name.
-2. Reads the size, ETag, and `Last-Modified` with a `HEAD` request.
+2. Reads the total size from `Content-Range`, plus the ETag and `Last-Modified`, with a one-byte `Range` request. Some servers break the Workflows HTTP client on `HEAD`.
 3. Downloads the file in `Range` requests of `chunk_bytes` and writes each chunk to `tmp/kev-epss/<run>/<feed>/`.
 4. Joins the chunks with the Cloud Storage `compose` call, in steps when there are more than 32.
 5. Fails the feed if the joined object's size differs from the source's `Content-Length`.
