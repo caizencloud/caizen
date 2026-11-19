@@ -316,9 +316,9 @@ image_info:
   steps:
     - parse:
         assign:
-          - at: ${text.find_all(ref, "@")[0].index}
-          - name: ${text.substring(ref, 0, at)}
-          - digest: ${text.substring(ref, at + 1, len(ref))}
+          - parts: ${text.split(ref, "@")}
+          - name: ${parts[0]}
+          - digest: ${parts[1]}
           - host: ${text.split(name, "/")[0]}
           - path: ${text.substring(name, len(host) + 1, len(name))}
           - base_url: ${"https://" + host + "/v2/" + path}
