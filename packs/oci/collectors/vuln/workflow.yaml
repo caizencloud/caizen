@@ -86,8 +86,15 @@ main:
                   token: ${token}
                 result: found
             - add_found:
+                for:
+                  value: cand
+                  in: ${found}
+                  steps:
+                    - append_candidate:
+                        assign:
+                          - candidates: ${list.concat(candidates, cand)}
+            - clear_found:
                 assign:
-                  - candidates: ${list.concat(candidates, found)}
                   - found: null
 
     # 2. Resolve each requested digest and find its base.
@@ -198,8 +205,13 @@ main:
                     in: ${keys(result.objects)}
                     steps:
                       - append:
-                          assign:
-                            - objects[feed]: ${list.concat(objects[feed], result.objects[feed])}
+                          for:
+                            value: uri
+                            in: ${result.objects[feed]}
+                            steps:
+                              - append_uri:
+                                  assign:
+                                    - objects[feed]: ${list.concat(objects[feed], uri)}
               - check_fatal:
                   switch:
                     - condition: ${result.status.status == "error" and result.status.step == "write"}
