@@ -49,5 +49,15 @@
     "path": "gcp-cai-resource/data/secretmanager.googleapis.com/SecretVersion/0",
     "redacted": "secrets/github-l*****8936",
     "reason": "Resource name of the ln-prod-automation connection's token secret version. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "*",
+    "path_prefix": "cisa-kev/",
+    "reason": "Public CISA KEV catalog downloaded from cisagov/kev-data. It cannot hold lonimbus secrets. Its reference URLs carry hashes that match ghost.clarifai.1 and words that match ghost.generic.3, and new entries arrive daily."
+  },
+  {
+    "rule_id": "*",
+    "path_prefix": "first-epss/",
+    "reason": "Public FIRST EPSS scores. It cannot hold lonimbus secrets."
   }
 ]
