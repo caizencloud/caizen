@@ -1,0 +1,380 @@
+# Downloads the CISA Known Exploited Vulnerabilities catalog and the FIRST
+# EPSS scores into the Caizen data bucket.
+#
+# Feeds, both of kind snapshot:
+#   cisa-kev    raw/cisa-kev/ingest_dt=<date>/run=<time>/data/known_exploited_vulnerabilities.json
+#   first-epss  raw/first-epss/ingest_dt=<date>/run=<time>/data/epss_scores-<date>.csv.gz
+# Each feed then gets _meta.json and _SUCCESS, written last.
+#
+# Workflows limits all variables in an execution to 512 KB and one string to
+# 256 KB, so each file is fetched in Range chunks of CHUNK_BYTES. Each chunk
+# is written to tmp/kev-epss/<run>/<feed>/, the chunks are joined with the
+# Cloud Storage compose call, and the result's size is checked against the
+# source's Content-Length. A lifecycle rule deletes tmp/ after one day.
+#
+# Configuration comes from environment variables set by Terraform:
+#   BUCKET, KEV_URL, EPSS_URL, CHUNK_BYTES, COLLECTOR_VERSION
+
+main:
+  steps:
+    - init:
+        assign:
+          - started: ${math.floor(sys.now())}
+          - started_text: ${text.substring(time.format(started), 0, 19) + "Z"}
+          - ingest_dt: ${text.substring(started_text, 0, 10)}
+          - run: ${text.replace_all(text.replace_all(started_text, "-", ""), ":", "")}
+          - bucket: ${sys.get_env("BUCKET")}
+          - chunk_bytes: ${int(sys.get_env("CHUNK_BYTES"))}
+          - version: ${sys.get_env("COLLECTOR_VERSION")}
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - results: {}
+          - failures: []
+          - sources:
+              - feed: cisa-kev
+                url: ${sys.get_env("KEV_URL")}
+                content_type: application/json
+              - feed: first-epss
+                url: ${sys.get_env("EPSS_URL")}
+                content_type: application/gzip
+    # One feed at a time keeps memory use to one chunk.
+    - each_source:
+        for:
+          value: src
+          in: ${sources}
+          steps:
+            - fetch:
+                try:
+                  steps:
+                    - run_feed:
+                        call: fetch_feed
+                        args:
+                          feed: ${src.feed}
+                          url: ${src.url}
+                          content_type: ${src.content_type}
+                          bucket: ${bucket}
+                          ingest_dt: ${ingest_dt}
+                          run: ${run}
+                          chunk_bytes: ${chunk_bytes}
+                          version: ${version}
+                          execution_id: ${execution_id}
+                        result: meta
+                    - record:
+                        assign:
+                          - results[src.feed]: ${meta.object}
+                except:
+                  as: e
+                  steps:
+                    - record_failure:
+                        assign:
+                          - failure:
+                              feed: ${src.feed}
+                              error: ${e}
+                          - failures: ${list.concat(failures, failure)}
+    - check_failures:
+        switch:
+          - condition: ${len(failures) > 0}
+            raise:
+              message: "One or more feeds failed"
+              failures: ${failures}
+              succeeded: ${results}
+    - done:
+        return:
+          run: ${run}
+          feeds: ${results}
+
+# Downloads one file in Range chunks, joins the chunks, checks the size, and
+# writes _meta.json and _SUCCESS.
+fetch_feed:
+  params: [feed, url, content_type, bucket, ingest_dt, run, chunk_bytes, version, execution_id]
+  steps:
+    # EPSS serves a fixed "current" URL that redirects to the dated file.
+    # Resolve it first, and name the stored object after the dated file.
+    - resolve_name:
+        call: final_name
+        args:
+          url: ${url}
+        result: resolved
+    - head:
+        try:
+          call: http.request
+          args:
+            method: HEAD
+            url: ${resolved.url}
+          result: h
+        retry: ${http.default_retry}
+    - read_headers:
+        assign:
+          - size: ${int(default(map.get(h.headers, "Content-Length"), map.get(h.headers, "content-length")))}
+          - etag: ${default(map.get(h.headers, "ETag"), map.get(h.headers, "etag"))}
+          - last_modified: ${default(map.get(h.headers, "Last-Modified"), map.get(h.headers, "last-modified"))}
+          - h: null
+          - final_url: ${resolved.url}
+          - filename: ${resolved.filename}
+          - prefix: ${"raw/" + feed + "/ingest_dt=" + ingest_dt + "/run=" + run}
+          - tmp_prefix: ${"tmp/kev-epss/" + run + "/" + feed}
+          - object: ${prefix + "/data/" + filename}
+          - chunks: []
+          - offset: 0
+          - index: 0
+          - catalog_version: null
+          - date_released: null
+    - get_chunk:
+        try:
+          call: http.get
+          args:
+            url: ${final_url}
+            headers:
+              Range: ${"bytes=" + string(offset) + "-" + string(math.min(offset + chunk_bytes, size) - 1)}
+          result: r
+        retry: ${http.default_retry}
+    - check_partial:
+        switch:
+          - condition: ${r.code != 206}
+            raise: ${"Expected 206 Partial Content, got " + string(r.code) + " from " + final_url}
+    - kev_version:
+        switch:
+          - condition: ${feed == "cisa-kev" and index == 0}
+            steps:
+              - parse_version:
+                  assign:
+                    - catalog_version: ${text.split(text.split(r.body, "catalogVersion")[1], "\"")[2]}
+                    - date_released: ${text.split(text.split(r.body, "dateReleased")[1], "\"")[2]}
+    - put_chunk:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${tmp_prefix + "/" + string(index)}
+          content_type: "application/octet-stream"
+          body: ${r.body}
+    - next_chunk:
+        assign:
+          - r: null
+          - chunks: ${list.concat(chunks, tmp_prefix + "/" + string(index))}
+          - offset: ${offset + chunk_bytes}
+          - index: ${index + 1}
+    - more:
+        switch:
+          - condition: ${offset < size}
+            next: get_chunk
+    - join:
+        call: compose_all
+        args:
+          bucket: ${bucket}
+          sources: ${chunks}
+          destination: ${object}
+          tmp_prefix: ${tmp_prefix}
+          content_type: ${content_type}
+        result: joined
+    - check_size:
+        switch:
+          - condition: ${int(joined.size) != size}
+            raise: ${"Joined object is " + joined.size + " bytes; the source reported " + string(size)}
+    - meta:
+        assign:
+          - meta:
+              feed: ${feed}
+              run: ${run}
+              source_url: ${url}
+              final_url: ${final_url}
+              etag: ${etag}
+              last_modified: ${last_modified}
+              size: ${size}
+              chunks: ${len(chunks)}
+              catalog_version: ${catalog_version}
+              date_released: ${date_released}
+              execution_id: ${execution_id}
+              collector: "kev-epss"
+              collector_version: ${version}
+              object: ${"gs://" + bucket + "/" + object}
+              objects: ${["gs://" + bucket + "/" + object]}
+    - write_meta:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_meta.json"}
+          content_type: "application/json"
+          body: ${json.encode_to_string(meta)}
+    - write_success:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_SUCCESS"}
+          content_type: "text/plain"
+          body: ""
+    - done:
+        return: ${meta}
+
+# Returns the URL a source redirects to, if any, and the file name to store.
+# Workflows may follow redirects itself, so a GET of the first byte is used
+# and a Location header is honored when present.
+final_name:
+  params: [url]
+  steps:
+    - probe:
+        try:
+          call: http.request
+          args:
+            method: HEAD
+            url: ${url}
+          result: p
+        except:
+          as: e
+          steps:
+            - redirected:
+                switch:
+                  - condition: ${map.get(e, "code") != null and e.code >= 300 and e.code < 400}
+                    assign:
+                      - p: ${e}
+                next: decide
+            - fail:
+                raise: ${e}
+    - decide:
+        assign:
+          - location: ${default(map.get(p.headers, "Location"), map.get(p.headers, "location"))}
+          - target: ${url}
+    - absolute:
+        switch:
+          - condition: ${location != null and text.match_regex(location, "^https?://")}
+            assign:
+              - target: ${location}
+          - condition: ${location != null}
+            assign:
+              - segs: ${text.split(url, "/")}
+              - target: ${text.substring(url, 0, len(url) - len(segs[len(segs) - 1])) + location}
+    - name:
+        assign:
+          - segs: ${text.split(target, "/")}
+        next: done
+    - done:
+        return:
+          url: ${target}
+          filename: ${segs[len(segs) - 1]}
+
+# Joins source objects into destination with the compose call, which takes
+# at most 32 sources. Longer lists are joined in steps through tmp_prefix.
+compose_all:
+  params: [bucket, sources, destination, tmp_prefix, content_type]
+  steps:
+    - init:
+        assign:
+          - pending: ${sources}
+          - step: 0
+    - loop:
+        switch:
+          - condition: ${len(pending) <= 32}
+            next: final
+    - partial:
+        assign:
+          - batch: []
+          - rest: []
+          - i: 0
+    - split:
+        for:
+          value: name
+          in: ${pending}
+          steps:
+            - place:
+                switch:
+                  - condition: ${i < 32}
+                    assign:
+                      - batch: ${list.concat(batch, name)}
+                  - condition: true
+                    assign:
+                      - rest: ${list.concat(rest, name)}
+            - count:
+                assign:
+                  - i: ${i + 1}
+    - join_batch:
+        call: compose
+        args:
+          bucket: ${bucket}
+          sources: ${batch}
+          destination: ${tmp_prefix + "/join-" + string(step)}
+          content_type: ${content_type}
+    - continue_loop:
+        assign:
+          - joined_name: ${tmp_prefix + "/join-" + string(step)}
+          - head: [""]
+          - head[0]: ${joined_name}
+          - pending: ${head}
+          - step: ${step + 1}
+    - append_rest:
+        for:
+          value: name
+          in: ${rest}
+          steps:
+            - add:
+                assign:
+                  - pending: ${list.concat(pending, name)}
+    - again:
+        next: loop
+    - final:
+        call: compose
+        args:
+          bucket: ${bucket}
+          sources: ${pending}
+          destination: ${destination}
+          content_type: ${content_type}
+        result: out
+    - done:
+        return: ${out}
+
+compose:
+  params: [bucket, sources, destination, content_type]
+  steps:
+    - build:
+        assign:
+          - source_objects: []
+    - each:
+        for:
+          value: name
+          in: ${sources}
+          steps:
+            - add:
+                assign:
+                  - entry:
+                      name: ${name}
+                  - source_objects: ${list.concat(source_objects, entry)}
+    - call_compose:
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/storage/v1/b/" + bucket + "/o/" + text.url_encode(destination) + "/compose"}
+            auth:
+              type: OAuth2
+            query:
+              ifGenerationMatch: 0
+            body:
+              sourceObjects: ${source_objects}
+              destination:
+                contentType: ${content_type}
+          result: r
+        retry: ${http.default_retry}
+    - done:
+        return: ${r.body}
+
+# Creates one object with a simple media upload. The collector can only
+# create objects, so an existing name fails the write.
+put_object:
+  params: [bucket, name, content_type, body]
+  steps:
+    - as_bytes:
+        switch:
+          - condition: ${get_type(body) == "string"}
+            assign:
+              - body: ${text.encode(body)}
+    - upload:
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
+            auth:
+              type: OAuth2
+            query:
+              uploadType: media
+              name: ${name}
+              ifGenerationMatch: 0
+            headers:
+              Content-Type: ${content_type}
+            body: ${body}
+        retry: ${http.default_retry}

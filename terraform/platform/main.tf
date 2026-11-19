@@ -11,4 +11,16 @@ resource "google_storage_bucket" "data" {
   location                    = upper(var.region)
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+
+  # Collectors stage partial downloads under tmp/. They can only create
+  # objects, so this rule removes the leftovers.
+  lifecycle_rule {
+    condition {
+      age            = 1
+      matches_prefix = ["tmp/"]
+    }
+    action {
+      type = "Delete"
+    }
+  }
 }
