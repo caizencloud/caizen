@@ -1,0 +1,472 @@
+# Collects a GitHub organization's settings, people, teams, repos, access,
+# protection, and automation into the Caizen data bucket.
+#
+# Feed github-api, kind snapshot. Each line is one API response page:
+#   {"endpoint", "params", "page", "status", "fetched_at", "body"}
+# written to raw/github-api/ingest_dt=<date>/run=<time>/part-<n>.ndjson,
+# then _meta.json, then _SUCCESS last.
+#
+# A 403 or 404 that means "not on this plan" or "not configured" is recorded
+# as a line with its status, because it is evidence too: a 403 on branch
+# protection means the repo has none. A 401, rate limiting, or a 5xx after
+# retries fails the run with no markers.
+#
+# Configuration comes from environment variables set by Terraform:
+#   ORG, BUCKET, TOKEN_SECRET (secret version resource name), PAGE_SIZE,
+#   COLLECTOR_VERSION
+
+main:
+  steps:
+    - init:
+        assign:
+          - started: ${math.floor(sys.now())}
+          - started_text: ${text.substring(time.format(started), 0, 19) + "Z"}
+          - ingest_dt: ${text.substring(started_text, 0, 10)}
+          - run: ${text.replace_all(text.replace_all(started_text, "-", ""), ":", "")}
+          - org: ${sys.get_env("ORG")}
+          - bucket: ${sys.get_env("BUCKET")}
+          - page_size: ${int(sys.get_env("PAGE_SIZE"))}
+          - version: ${sys.get_env("COLLECTOR_VERSION")}
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - prefix: ${"raw/github-api/ingest_dt=" + ingest_dt + "/run=" + run}
+          - st:
+              seq: 0
+              objects: []
+              calls: 0
+    - read_token:
+        call: http.get
+        args:
+          url: ${"https://secretmanager.googleapis.com/v1/" + sys.get_env("TOKEN_SECRET") + ":access"}
+          auth:
+            type: OAuth2
+        result: secret
+    - keep_token:
+        assign:
+          - token: ${text.decode(base64.decode(secret.body.payload.data))}
+          - secret: null
+
+    # Organization-wide endpoints.
+    - org_endpoints:
+        assign:
+          - org_paths:
+              - ${"/orgs/" + org}
+              - ${"/orgs/" + org + "/members?role=admin"}
+              - ${"/orgs/" + org + "/members?role=member"}
+              - ${"/orgs/" + org + "/outside_collaborators"}
+              - ${"/orgs/" + org + "/installations"}
+              - ${"/orgs/" + org + "/actions/permissions"}
+              - ${"/orgs/" + org + "/hooks"}
+              - "/user"
+    - each_org_path:
+        for:
+          value: path
+          in: ${org_paths}
+          steps:
+            - get:
+                call: fetch
+                args:
+                  path: ${path}
+                  collect: null
+                  st: ${st}
+                  token: ${token}
+                  page_size: ${page_size}
+                  bucket: ${bucket}
+                  prefix: ${prefix}
+                result: out
+            - keep:
+                assign:
+                  - st: ${out.st}
+
+    # Teams, their members, and their repo access.
+    - list_teams:
+        call: fetch
+        args:
+          path: ${"/orgs/" + org + "/teams"}
+          collect: slug
+          st: ${st}
+          token: ${token}
+          page_size: ${page_size}
+          bucket: ${bucket}
+          prefix: ${prefix}
+        result: teams
+    - keep_teams:
+        assign:
+          - st: ${teams.st}
+    - each_team:
+        for:
+          value: slug
+          in: ${teams.keys}
+          steps:
+            - team_paths:
+                assign:
+                  - paths:
+                      - ${"/orgs/" + org + "/teams/" + slug + "/members?role=maintainer"}
+                      - ${"/orgs/" + org + "/teams/" + slug + "/members?role=member"}
+                      - ${"/orgs/" + org + "/teams/" + slug + "/repos"}
+            - each_team_path:
+                for:
+                  value: path
+                  in: ${paths}
+                  steps:
+                    - get:
+                        call: fetch
+                        args:
+                          path: ${path}
+                          collect: null
+                          st: ${st}
+                          token: ${token}
+                          page_size: ${page_size}
+                          bucket: ${bucket}
+                          prefix: ${prefix}
+                        result: out
+                    - keep:
+                        assign:
+                          - st: ${out.st}
+
+    # Repos and everything per repo.
+    - list_repos:
+        call: fetch
+        args:
+          path: ${"/orgs/" + org + "/repos?type=all"}
+          collect: name
+          st: ${st}
+          token: ${token}
+          page_size: ${page_size}
+          bucket: ${bucket}
+          prefix: ${prefix}
+        result: repos
+    - keep_repos:
+        assign:
+          - st: ${repos.st}
+    - each_repo:
+        for:
+          value: repo
+          in: ${repos.keys}
+          steps:
+            - collect_repo:
+                call: collect_repo
+                args:
+                  org: ${org}
+                  repo: ${repo}
+                  st: ${st}
+                  token: ${token}
+                  page_size: ${page_size}
+                  bucket: ${bucket}
+                  prefix: ${prefix}
+                result: st
+
+    - markers:
+        assign:
+          - token: null
+          - meta:
+              feed: github-api
+              run: ${run}
+              started: ${started_text}
+              org: ${org}
+              repos: ${repos.keys}
+              teams: ${teams.keys}
+              calls: ${st.calls}
+              execution_id: ${execution_id}
+              collector: "github-repos"
+              collector_version: ${version}
+              objects: ${st.objects}
+    - write_meta:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_meta.json"}
+          content_type: "application/json"
+          body: ${json.encode_to_string(meta)}
+    - write_success:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_SUCCESS"}
+          content_type: "text/plain"
+          body: ""
+    - done:
+        return:
+          run: ${run}
+          repos: ${repos.keys}
+          teams: ${teams.keys}
+          calls: ${st.calls}
+          objects: ${len(st.objects)}
+
+# Collects one repo: its details, access, protection, automation, and owners.
+collect_repo:
+  params: [org, repo, st, token, page_size, bucket, prefix]
+  steps:
+    - details:
+        call: fetch
+        args:
+          path: ${"/repos/" + org + "/" + repo}
+          collect: null
+          st: ${st}
+          token: ${token}
+          page_size: ${page_size}
+          bucket: ${bucket}
+          prefix: ${prefix}
+          keep_body: true
+        result: out
+    - read_details:
+        assign:
+          - st: ${out.st}
+          - branch: ${default(map.get(out.body, "default_branch"), "main")}
+          - base: ${"/repos/" + org + "/" + repo}
+          - paths:
+              - ${base + "/collaborators?affiliation=all"}
+              - ${base + "/teams"}
+              - ${base + "/branches/" + branch + "/protection"}
+              - ${base + "/rulesets?includes_parents=true"}
+              - ${base + "/hooks"}
+              - ${base + "/keys"}
+              - ${base + "/actions/permissions"}
+              - ${base + "/contents/CODEOWNERS"}
+              - ${base + "/contents/.github/CODEOWNERS"}
+              - ${base + "/contents/docs/CODEOWNERS"}
+    - each_path:
+        for:
+          value: path
+          in: ${paths}
+          steps:
+            - get:
+                call: fetch
+                args:
+                  path: ${path}
+                  collect: null
+                  st: ${st}
+                  token: ${token}
+                  page_size: ${page_size}
+                  bucket: ${bucket}
+                  prefix: ${prefix}
+                result: out
+            - keep:
+                assign:
+                  - st: ${out.st}
+    - list_workflows:
+        call: fetch
+        args:
+          path: ${base + "/contents/.github/workflows"}
+          collect: path
+          st: ${st}
+          token: ${token}
+          page_size: ${page_size}
+          bucket: ${bucket}
+          prefix: ${prefix}
+        result: wf
+    - keep_wf:
+        assign:
+          - st: ${wf.st}
+    - each_workflow:
+        for:
+          value: file
+          in: ${wf.keys}
+          steps:
+            - get_file:
+                call: fetch
+                args:
+                  path: ${base + "/contents/" + file}
+                  collect: null
+                  st: ${st}
+                  token: ${token}
+                  page_size: ${page_size}
+                  bucket: ${bucket}
+                  prefix: ${prefix}
+                result: out
+            - keep_file:
+                assign:
+                  - st: ${out.st}
+    - done:
+        return: ${st}
+
+# Fetches every page of one endpoint and writes each page as one line in its
+# own part object. When collect names a field, returns that field from each
+# item of a list response. With keep_body, also returns the first page body.
+fetch:
+  params: [path, collect, st, token, page_size, bucket, prefix, keep_body: false]
+  steps:
+    - init:
+        assign:
+          - sep: ${if(text.match_regex(path, "\\?"), "&", "?")}
+          - url: ${"https://api.github.com" + path + sep + "per_page=" + string(page_size)}
+          - page: 1
+          - keys: []
+          - first_body: null
+    - get_page:
+        try:
+          call: http.get
+          args:
+            url: ${url}
+            headers:
+              Authorization: ${"Bearer " + token}
+              Accept: "application/vnd.github+json"
+              X-GitHub-Api-Version: "2022-11-28"
+          result: r
+        retry:
+          predicate: ${retry_transient}
+          max_retries: 3
+          backoff:
+            initial_delay: 2
+            max_delay: 30
+            multiplier: 2
+        except:
+          as: e
+          steps:
+            - fatal:
+                call: check_fatal
+                args:
+                  e: ${e}
+                  path: ${path}
+            - as_response:
+                assign:
+                  - r:
+                      code: ${e.code}
+                      body: ${map.get(e, "body")}
+                      headers: null
+            - error_headers:
+                switch:
+                  - condition: ${"headers" in e}
+                    assign:
+                      - r.headers: ${e.headers}
+    - line:
+        assign:
+          - st.calls: ${st.calls + 1}
+          - entry:
+              endpoint: ${path}
+              params:
+                per_page: ${page_size}
+                page: ${page}
+              page: ${page}
+              status: ${r.code}
+              fetched_at: ${text.substring(time.format(sys.now()), 0, 19) + "Z"}
+              body: ${r.body}
+          - name: ${prefix + "/part-" + string(st.seq) + ".ndjson"}
+    - write:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${name}
+          content_type: "application/x-ndjson"
+          body: ${json.encode_to_string(entry) + "\n"}
+    - record:
+        assign:
+          - st.objects: ${list.concat(st.objects, "gs://" + bucket + "/" + name)}
+          - st.seq: ${st.seq + 1}
+          - entry: null
+    - keep_first:
+        switch:
+          - condition: ${keep_body and page == 1}
+            assign:
+              - first_body: ${r.body}
+    - collect_keys:
+        switch:
+          - condition: ${collect != null and r.code == 200 and get_type(r.body) == "list"}
+            steps:
+              - each_item:
+                  for:
+                    value: item
+                    in: ${r.body}
+                    steps:
+                      - add_key:
+                          assign:
+                            - keys: ${list.concat(keys, item[collect])}
+    - next_link:
+        assign:
+          - link: null
+          - url: null
+    - read_link:
+        switch:
+          - condition: ${r.headers != null}
+            assign:
+              - link: ${default(map.get(r.headers, "Link"), map.get(r.headers, "link"))}
+    - clear_response:
+        assign:
+          - r: null
+    - find_next:
+        switch:
+          - condition: ${link != null}
+            steps:
+              - each_link:
+                  for:
+                    value: part
+                    in: ${text.split(link, ",")}
+                    steps:
+                      - is_next:
+                          switch:
+                            - condition: ${text.match_regex(part, "rel=\"next\"")}
+                              assign:
+                                - url: ${text.split(text.split(part, "<")[1], ">")[0]}
+    - more:
+        switch:
+          - condition: ${url != null}
+            assign:
+              - page: ${page + 1}
+            next: get_page
+    - done:
+        return:
+          st: ${st}
+          keys: ${keys}
+          body: ${first_body}
+
+# Retries connection errors, 5xx, and 429.
+retry_transient:
+  params: [e]
+  steps:
+    - check:
+        switch:
+          - condition: ${not("HttpError" in e.tags)}
+            return: true
+          - condition: ${e.code == 429 or e.code >= 500}
+            return: true
+    - no:
+        return: false
+
+# Raises for responses that mean the collection itself is broken: a bad
+# token, rate limiting, or a server error that survived retries. Plan-gated
+# and not-found responses return normally and are recorded.
+check_fatal:
+  params: [e, path]
+  steps:
+    - not_http:
+        switch:
+          - condition: ${not("HttpError" in e.tags)}
+            raise: ${e}
+    - classify:
+        assign:
+          - remaining: "1"
+    - read_remaining:
+        switch:
+          - condition: ${"headers" in e}
+            assign:
+              - remaining: ${default(map.get(e.headers, "X-Ratelimit-Remaining"), default(map.get(e.headers, "x-ratelimit-remaining"), "1"))}
+    - decide:
+        switch:
+          - condition: ${e.code == 401}
+            raise: ${"GitHub rejected the token (401) on " + path}
+          - condition: ${e.code == 429 or (e.code == 403 and remaining == "0")}
+            raise: ${"GitHub rate limit reached on " + path}
+          - condition: ${e.code >= 500}
+            raise: ${"GitHub returned " + string(e.code) + " on " + path + " after retries"}
+    - ok:
+        return: null
+
+# Creates one object with a simple media upload. The collector can only
+# create objects, so an existing name fails the write.
+put_object:
+  params: [bucket, name, content_type, body]
+  steps:
+    - upload:
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
+            auth:
+              type: OAuth2
+            query:
+              uploadType: media
+              name: ${name}
+              ifGenerationMatch: 0
+            headers:
+              Content-Type: ${content_type}
+            body: ${text.encode(body)}
+        retry: ${http.default_retry}
