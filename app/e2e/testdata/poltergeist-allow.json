@@ -1,0 +1,53 @@
+[
+  {
+    "rule_id": "ghost.clarifai.1",
+    "path": "gcp-cai-resource/_meta.json",
+    "reason": "Hex ID at the end of the exportAssets operation name. It changes every run, so no redacted value is pinned."
+  },
+  {
+    "rule_id": "ghost.clarifai.1",
+    "path": "gcp-cai-iam-policy/_meta.json",
+    "reason": "Hex ID at the end of the exportAssets operation name. It changes every run, so no redacted value is pinned."
+  },
+  {
+    "rule_id": "ghost.clarifai.1",
+    "path": "gcp-cai-org-policy/_meta.json",
+    "reason": "Hex ID at the end of the exportAssets operation name. It changes every run, so no redacted value is pinned."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/cloudbuild.googleapis.com/Connection/0",
+    "redacted": "secrets/github-l*****30f9",
+    "reason": "Resource name of the ln-prod-web connection's token secret. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/cloudbuild.googleapis.com/Connection/0",
+    "redacted": "secrets/github-l*****8936",
+    "reason": "Resource name of the ln-prod-automation connection's token secret. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/secretmanager.googleapis.com/Secret/0",
+    "redacted": "secrets/github-l*****30f9",
+    "reason": "Resource name of the ln-prod-web connection's token secret. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/secretmanager.googleapis.com/Secret/0",
+    "redacted": "secrets/github-l*****8936",
+    "reason": "Resource name of the ln-prod-automation connection's token secret. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/secretmanager.googleapis.com/SecretVersion/0",
+    "redacted": "secrets/github-l*****30f9",
+    "reason": "Resource name of the ln-prod-web connection's token secret version. CAI exports names, never payloads."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "gcp-cai-resource/data/secretmanager.googleapis.com/SecretVersion/0",
+    "redacted": "secrets/github-l*****8936",
+    "reason": "Resource name of the ln-prod-automation connection's token secret version. CAI exports names, never payloads."
+  }
+]

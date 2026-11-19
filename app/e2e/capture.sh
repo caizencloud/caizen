@@ -2,7 +2,8 @@
 # Copies the latest successful run of each feed from a Caizen data bucket
 # into app/e2e/testdata/raw/, keeping the raw/ layout. Records whose
 # ancestors include any EXCLUDE_ANCESTORS entry are dropped. The capture
-# fails if any file matches a credential pattern.
+# fails if Poltergeist (github.com/ghostsecurity/poltergeist) finds a secret
+# that is not in app/e2e/testdata/poltergeist-allow.json.
 #
 # Usage:
 #   BUCKET=<data bucket> [EXCLUDE_ANCESTORS=folders/123,folders/456] \
@@ -13,6 +14,8 @@ set -euo pipefail
 : "${BUCKET:?Set BUCKET to the Caizen data bucket}"
 FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package}"
 EXCLUDE_ANCESTORS="${EXCLUDE_ANCESTORS:-}"
+
+command -v poltergeist >/dev/null || { echo "poltergeist is not on PATH. See github.com/ghostsecurity/poltergeist/releases." >&2; exit 1; }
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${ROOT}/app/e2e/testdata"
@@ -53,10 +56,31 @@ for feed in ${FEEDS}; do
   fi
 done
 
-pattern='ghu_[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
-if grep -rEl "${pattern}" "${OUT}/raw"; then
-  echo "Credential pattern found in the files above. Nothing should be committed." >&2
+# Poltergeist exits 1 when it finds anything, so read its JSON instead of
+# its exit code. A result is allowed when an allowlist entry has the same
+# rule_id and path (with ingest_dt= and run= removed), and the same redacted
+# value when the entry pins one.
+ALLOW="${OUT}/poltergeist-allow.json"
+REPORT="$(mktemp)"
+trap 'rm -f "${REPORT}"' EXIT
+poltergeist -no-color -format json -output "${REPORT}" "${OUT}/raw" >/dev/null 2>&1 || true
+jq -e '.summary' "${REPORT}" >/dev/null || { echo "Poltergeist did not write a report" >&2; exit 1; }
+
+unexpected="$(jq -c --slurpfile allow "${ALLOW}" --arg raw "${OUT}/raw/" '
+  [.results[]?
+   | .path = (.file_path | ltrimstr($raw) | sub("/ingest_dt=[^/]*/run=[^/]*"; ""))
+   | . as $r
+   | select(any($allow[0][]; .rule_id == $r.rule_id and .path == $r.path
+       and ((.redacted // null) == null or .redacted == $r.redacted)) | not)
+   | {rule_id, path, line_number, redacted}]' "${REPORT}")"
+
+allowed="$(jq '.summary.matches_found' "${REPORT}")"
+if [ "${unexpected}" != "[]" ]; then
+  echo "Poltergeist found secrets that are not in ${ALLOW}:" >&2
+  echo "${unexpected}" | jq -r '.[] | "  \(.rule_id)  \(.path):\(.line_number)  \(.redacted)"' >&2
+  echo "Fix the source or add a reviewed allowlist entry. Nothing should be committed." >&2
   exit 1
 fi
+echo "Poltergeist: ${allowed} matches, all in the allowlist"
 
 echo "Captured into ${OUT}/raw"
