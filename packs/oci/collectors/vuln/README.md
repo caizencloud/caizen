@@ -5,7 +5,7 @@ Terraform module that collects container image facts and Google Artifact Analysi
 ## How it works
 
 1. The Workflow lists every Docker image in the Artifact Registry repos of `registry_projects` in `region`, with each image's config `diff_ids`. These are the base candidates.
-2. For each requested digest, it fetches the manifest and config. For an image index, it follows the `linux/amd64` entry. The base is the candidate whose `diff_ids` are the longest strict prefix of the digest's `diff_ids`.
+2. For each requested digest, it fetches the manifest and config as files from the Artifact Registry REST API. For an image index, it follows the `linux/amd64` entry. The base is the candidate whose `diff_ids` are the longest strict prefix of the digest's `diff_ids`.
 3. For each requested digest and each base, it writes one `oci-image` line, then pages through the `VULNERABILITY`, `BUILD`, `DISCOVERY`, and `PACKAGE` occurrences and writes each page as one part object.
 4. A failure for one digest is recorded in `_meta.json` and does not stop the others. A failed bucket write fails the execution with no markers.
 5. For each feed, it writes `_meta.json`, then `_SUCCESS` last.
@@ -49,4 +49,4 @@ gcloud workflows run oci-vuln --location=<region> \
 
 ## Identity
 
-`oci-vuln-sa` gets `roles/iam.serviceAccountTokenCreator` on itself (Workflows attaches OAuth2 tokens only for `*.googleapis.com`, so it mints a token for the registry), `roles/artifactregistry.reader` and `roles/containeranalysis.occurrences.viewer` on each registry project, `roles/storage.objectCreator` on the bucket limited to `raw/oci-*` and `raw/gcp-aa-*`, and `roles/logging.logWriter`.
+`oci-vuln-sa` gets `roles/artifactregistry.reader` and `roles/containeranalysis.occurrences.viewer` on each registry project, `roles/storage.objectCreator` on the bucket limited to `raw/oci-*` and `raw/gcp-aa-*`, and `roles/logging.logWriter`.

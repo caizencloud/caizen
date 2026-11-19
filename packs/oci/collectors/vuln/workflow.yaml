@@ -38,7 +38,6 @@ main:
           - page_size: ${int(sys.get_env("PAGE_SIZE"))}
           - version: ${sys.get_env("COLLECTOR_VERSION")}
           - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
-          - service_account: ${sys.get_env("SERVICE_ACCOUNT")}
           - feeds: ["oci-image", "gcp-aa-vulnerability", "gcp-aa-build", "gcp-aa-discovery", "gcp-aa-package"]
           - requested: ${args.digests}
           - candidates: []
@@ -47,22 +46,6 @@ main:
           - statuses: {}
           - objects: {}
           - fatal: []
-    # Workflows attaches OAuth2 tokens only for *.googleapis.com hosts. The
-    # registry is on *.docker.pkg.dev, so mint a token and send it as a header.
-    - registry_token:
-        call: http.post
-        args:
-          url: ${"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/" + service_account + ":generateAccessToken"}
-          auth:
-            type: OAuth2
-          body:
-            scope: ["https://www.googleapis.com/auth/cloud-platform"]
-            lifetime: "3600s"
-        result: minted
-    - keep_token:
-        assign:
-          - token: ${minted.body.accessToken}
-          - minted: null
     - init_objects:
         for:
           value: feed
@@ -83,7 +66,6 @@ main:
                 args:
                   project: ${project}
                   region: ${region}
-                  token: ${token}
                 result: found
             - add_found:
                 for:
@@ -113,7 +95,6 @@ main:
                           call: image_info
                           args:
                             ref: ${ref}
-                            token: ${token}
                           result: info
                       - find:
                           call: find_base
@@ -194,7 +175,6 @@ main:
                     ingest_dt: ${ingest_dt}
                     run: ${run}
                     page_size: ${page_size}
-                    token: ${token}
                   result: result
               - record:
                   assign:
@@ -224,6 +204,7 @@ main:
             raise:
               message: "Writing to the bucket failed. No markers were written."
               digests: ${fatal}
+              statuses: ${statuses}
 
     # 5. Markers, _SUCCESS last.
     - write_markers:
@@ -273,7 +254,7 @@ main:
 # Lists every Docker image in a project's repos in one region, with its
 # diff_ids, as base candidates.
 list_candidates:
-  params: [project, region, token]
+  params: [project, region]
   steps:
     - init:
         assign:
@@ -317,7 +298,6 @@ list_candidates:
                           call: image_info
                           args:
                             ref: ${image.uri}
-                            token: ${token}
                           result: info
                         except:
                           as: e
@@ -342,36 +322,28 @@ list_candidates:
     - done:
         return: ${out}
 
-# Fetches a digest's manifest and config. Follows the linux/amd64 entry of
-# an image index.
+# Fetches a digest's manifest and config through the Artifact Registry
+# REST API, which serves manifests as <package>/manifests/<digest> files and
+# blobs as <digest> files. Follows the linux/amd64 entry of an image index.
 image_info:
-  params: [ref, token]
+  params: [ref]
   steps:
     - parse:
         assign:
           - parts: ${text.split(ref, "@")}
           - name: ${parts[0]}
           - digest: ${parts[1]}
-          - host: ${text.split(name, "/")[0]}
-          - path: ${text.substring(name, len(host) + 1, len(name))}
-          - base_url: ${"https://" + host + "/v2/" + path}
+          - segs: ${text.split(name, "/")}
+          - location: ${text.replace_all(segs[0], "-docker.pkg.dev", "")}
+          - package: ${text.substring(name, len(segs[0] + "/" + segs[1] + "/" + segs[2]) + 1, len(name))}
+          - files: ${"https://artifactregistry.googleapis.com/download/v1/projects/" + segs[1] + "/locations/" + location + "/repositories/" + segs[2] + "/files/"}
+          - manifest_prefix: ${files + text.replace_all(package, "/", "%2F") + "%2Fmanifests%2F"}
           - index: null
     - get_manifest:
-        call: http.get
+        call: download
         args:
-          url: ${base_url + "/manifests/" + digest}
-          headers:
-            Authorization: ${"Bearer " + token}
-            Accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
-        result: r
-    - decode_manifest:
-        call: as_map
-        args:
-          body: ${r.body}
+          url: ${manifest_prefix + digest + ":download"}
         result: manifest
-    - clear_decode_manifest:
-        assign:
-          - r: null
     - is_index:
         switch:
           - condition: ${"manifests" in manifest}
@@ -399,36 +371,15 @@ image_info:
           - condition: ${index == null}
             raise: "Image index has no linux/amd64 manifest"
     - get_platform_manifest:
-        call: http.get
+        call: download
         args:
-          url: ${base_url + "/manifests/" + digest}
-          headers:
-            Authorization: ${"Bearer " + token}
-            Accept: "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
-        result: r
-    - decode_platform_manifest:
-        call: as_map
-        args:
-          body: ${r.body}
+          url: ${manifest_prefix + digest + ":download"}
         result: manifest
-    - clear_decode_platform_manifest:
-        assign:
-          - r: null
     - get_config:
-        call: http.get
+        call: download
         args:
-          url: ${base_url + "/blobs/" + manifest.config.digest}
-          headers:
-            Authorization: ${"Bearer " + token}
-        result: c
-    - decode_config:
-        call: as_map
-        args:
-          body: ${c.body}
+          url: ${files + manifest.config.digest + ":download"}
         result: config
-    - clear_decode_config:
-        assign:
-          - c: null
     - done:
         return:
           ref: ${ref}
@@ -437,6 +388,29 @@ image_info:
           manifest: ${manifest}
           config: ${config}
           diff_ids: ${config.rootfs.diff_ids}
+
+# Downloads one Artifact Registry file and returns it as a map.
+download:
+  params: [url]
+  steps:
+    - get:
+        try:
+          call: http.get
+          args:
+            url: ${url}
+            auth:
+              type: OAuth2
+            query:
+              alt: media
+          result: r
+        retry: ${http.default_retry}
+    - decode:
+        call: as_map
+        args:
+          body: ${r.body}
+        result: out
+    - done:
+        return: ${out}
 
 # Returns the candidate whose diff_ids are the longest strict prefix of the
 # image's diff_ids, or null.
@@ -487,7 +461,7 @@ find_base:
 # Artifact Analysis feeds. Returns the digest's status and the objects it
 # wrote, by feed.
 collect_digest:
-  params: [ref, target, bucket, ingest_dt, run, page_size, token]
+  params: [ref, target, bucket, ingest_dt, run, page_size]
   steps:
     - init:
         assign:
@@ -511,7 +485,6 @@ collect_digest:
                 call: image_info
                 args:
                   ref: ${ref}
-                  token: ${token}
                 result: info
             - image_line:
                 assign:
