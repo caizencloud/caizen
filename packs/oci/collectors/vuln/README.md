@@ -49,4 +49,4 @@ gcloud workflows run oci-vuln --location=<region> \
 
 ## Identity
 
-`oci-vuln-sa` gets `roles/artifactregistry.reader` and `roles/containeranalysis.occurrences.viewer` on each registry project, `roles/storage.objectCreator` on the bucket limited to `raw/oci-*` and `raw/gcp-aa-*`, and `roles/logging.logWriter`.
+`oci-vuln-sa` gets `roles/iam.serviceAccountTokenCreator` on itself (Workflows attaches OAuth2 tokens only for `*.googleapis.com`, so it mints a token for the registry), `roles/artifactregistry.reader` and `roles/containeranalysis.occurrences.viewer` on each registry project, `roles/storage.objectCreator` on the bucket limited to `raw/oci-*` and `raw/gcp-aa-*`, and `roles/logging.logWriter`.

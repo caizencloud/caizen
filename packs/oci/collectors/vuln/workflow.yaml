@@ -38,6 +38,7 @@ main:
           - page_size: ${int(sys.get_env("PAGE_SIZE"))}
           - version: ${sys.get_env("COLLECTOR_VERSION")}
           - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - service_account: ${sys.get_env("SERVICE_ACCOUNT")}
           - feeds: ["oci-image", "gcp-aa-vulnerability", "gcp-aa-build", "gcp-aa-discovery", "gcp-aa-package"]
           - requested: ${args.digests}
           - candidates: []
@@ -46,6 +47,22 @@ main:
           - statuses: {}
           - objects: {}
           - fatal: []
+    # Workflows attaches OAuth2 tokens only for *.googleapis.com hosts. The
+    # registry is on *.docker.pkg.dev, so mint a token and send it as a header.
+    - registry_token:
+        call: http.post
+        args:
+          url: ${"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/" + service_account + ":generateAccessToken"}
+          auth:
+            type: OAuth2
+          body:
+            scope: ["https://www.googleapis.com/auth/cloud-platform"]
+            lifetime: "3600s"
+        result: minted
+    - keep_token:
+        assign:
+          - token: ${minted.body.accessToken}
+          - minted: null
     - init_objects:
         for:
           value: feed
@@ -66,6 +83,7 @@ main:
                 args:
                   project: ${project}
                   region: ${region}
+                  token: ${token}
                 result: found
             - add_found:
                 assign:
@@ -88,6 +106,7 @@ main:
                           call: image_info
                           args:
                             ref: ${ref}
+                            token: ${token}
                           result: info
                       - find:
                           call: find_base
@@ -168,6 +187,7 @@ main:
                     ingest_dt: ${ingest_dt}
                     run: ${run}
                     page_size: ${page_size}
+                    token: ${token}
                   result: result
               - record:
                   assign:
@@ -241,7 +261,7 @@ main:
 # Lists every Docker image in a project's repos in one region, with its
 # diff_ids, as base candidates.
 list_candidates:
-  params: [project, region]
+  params: [project, region, token]
   steps:
     - init:
         assign:
@@ -285,6 +305,7 @@ list_candidates:
                           call: image_info
                           args:
                             ref: ${image.uri}
+                            token: ${token}
                           result: info
                         except:
                           as: e
@@ -312,7 +333,7 @@ list_candidates:
 # Fetches a digest's manifest and config. Follows the linux/amd64 entry of
 # an image index.
 image_info:
-  params: [ref]
+  params: [ref, token]
   steps:
     - parse:
         assign:
@@ -327,9 +348,8 @@ image_info:
         call: http.get
         args:
           url: ${base_url + "/manifests/" + digest}
-          auth:
-            type: OAuth2
           headers:
+            Authorization: ${"Bearer " + token}
             Accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
         result: r
     - decode_manifest:
@@ -366,9 +386,8 @@ image_info:
         call: http.get
         args:
           url: ${base_url + "/manifests/" + digest}
-          auth:
-            type: OAuth2
           headers:
+            Authorization: ${"Bearer " + token}
             Accept: "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
         result: r
     - decode_platform_manifest:
@@ -379,8 +398,8 @@ image_info:
         call: http.get
         args:
           url: ${base_url + "/blobs/" + manifest.config.digest}
-          auth:
-            type: OAuth2
+          headers:
+            Authorization: ${"Bearer " + token}
         result: c
     - decode_config:
         assign:
@@ -444,7 +463,7 @@ find_base:
 # Artifact Analysis feeds. Returns the digest's status and the objects it
 # wrote, by feed.
 collect_digest:
-  params: [ref, target, bucket, ingest_dt, run, page_size]
+  params: [ref, target, bucket, ingest_dt, run, page_size, token]
   steps:
     - init:
         assign:
@@ -468,6 +487,7 @@ collect_digest:
                 call: image_info
                 args:
                   ref: ${ref}
+                  token: ${token}
                 result: info
             - image_line:
                 assign:
