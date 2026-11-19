@@ -583,16 +583,17 @@ put_object:
   params: [bucket, name, content_type, body]
   steps:
     - upload:
-        call: http.post
-        args:
-          url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
-          auth:
-            type: OAuth2
-          query:
-            uploadType: media
-            name: ${name}
-            ifGenerationMatch: 0
-          headers:
-            Content-Type: ${content_type}
-          body: ${body}
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
+            auth:
+              type: OAuth2
+            query:
+              uploadType: media
+              name: ${name}
+              ifGenerationMatch: 0
+            headers:
+              Content-Type: ${content_type}
+            body: ${body}
         retry: ${http.default_retry}
