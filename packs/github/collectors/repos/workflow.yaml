@@ -62,7 +62,7 @@ main:
           value: path
           in: ${org_paths}
           steps:
-            - get:
+            - get_org:
                 call: fetch
                 args:
                   path: ${path}
@@ -73,7 +73,7 @@ main:
                   bucket: ${bucket}
                   prefix: ${prefix}
                 result: out
-            - keep:
+            - keep_org:
                 assign:
                   - st: ${out.st}
 
@@ -108,7 +108,7 @@ main:
                   value: path
                   in: ${paths}
                   steps:
-                    - get:
+                    - get_team:
                         call: fetch
                         args:
                           path: ${path}
@@ -119,7 +119,7 @@ main:
                           bucket: ${bucket}
                           prefix: ${prefix}
                         result: out
-                    - keep:
+                    - keep_team:
                         assign:
                           - st: ${out.st}
 
