@@ -1,0 +1,598 @@
+# Collects container image facts and Artifact Analysis occurrences for a
+# list of image digests, plus the base image of each one.
+#
+# Input: {"digests": ["us-central1-docker.pkg.dev/<project>/<repo>/<image>@sha256:<hex>", ...]}
+#
+# Feeds, all of kind event (a run covers only the digests it was given):
+#   oci-image             one line per digest: manifest and config
+#   gcp-aa-vulnerability  one line per VULNERABILITY occurrence
+#   gcp-aa-build          one line per BUILD occurrence
+#   gcp-aa-discovery      one line per DISCOVERY occurrence
+#   gcp-aa-package        one line per PACKAGE occurrence
+#
+# Each feed writes raw/<feed>/ingest_dt=<date>/run=<time>/part-<digest12>-<page>.ndjson,
+# then _meta.json, then _SUCCESS last.
+#
+# A base image is the image in the registry repos of REGISTRY_PROJECTS whose
+# diff_ids are the longest strict prefix of the digest's diff_ids.
+#
+# Workflows limits all variables in an execution to 512 KB, so occurrences
+# are paged in small pages and each page is written and cleared at once.
+#
+# Configuration comes from environment variables set by Terraform:
+#   BUCKET, REGION, REGISTRY_PROJECTS (comma-separated), PAGE_SIZE,
+#   COLLECTOR_VERSION
+
+main:
+  params: [args]
+  steps:
+    - init:
+        assign:
+          - started: ${math.floor(sys.now())}
+          - started_text: ${text.substring(time.format(started), 0, 19) + "Z"}
+          - ingest_dt: ${text.substring(started_text, 0, 10)}
+          - run: ${text.replace_all(text.replace_all(started_text, "-", ""), ":", "")}
+          - bucket: ${sys.get_env("BUCKET")}
+          - region: ${sys.get_env("REGION")}
+          - registry_projects: ${text.split(sys.get_env("REGISTRY_PROJECTS"), ",")}
+          - page_size: ${int(sys.get_env("PAGE_SIZE"))}
+          - version: ${sys.get_env("COLLECTOR_VERSION")}
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - feeds: ["oci-image", "gcp-aa-vulnerability", "gcp-aa-build", "gcp-aa-discovery", "gcp-aa-package"]
+          - requested: ${args.digests}
+          - candidates: []
+          - infos: {}
+          - targets: {}
+          - statuses: {}
+          - objects: {}
+          - fatal: []
+    - init_objects:
+        for:
+          value: feed
+          in: ${feeds}
+          steps:
+            - empty_list:
+                assign:
+                  - objects[feed]: []
+
+    # 1. Base candidates: every image in the Docker repos of REGISTRY_PROJECTS.
+    - list_candidates:
+        for:
+          value: project
+          in: ${registry_projects}
+          steps:
+            - list_project:
+                call: list_candidates
+                args:
+                  project: ${project}
+                  region: ${region}
+                result: found
+            - add_found:
+                assign:
+                  - candidates: ${list.concat(candidates, found)}
+                  - found: null
+
+    # 2. Resolve each requested digest and find its base.
+    - resolve_requested:
+        parallel:
+          shared: [infos, statuses]
+          concurrency_limit: 2
+          for:
+            value: ref
+            in: ${requested}
+            steps:
+              - resolve:
+                  try:
+                    steps:
+                      - get_info:
+                          call: image_info
+                          args:
+                            ref: ${ref}
+                          result: info
+                      - find:
+                          call: find_base
+                          args:
+                            info: ${info}
+                            candidates: ${candidates}
+                          result: base_ref
+                      - keep:
+                          assign:
+                            - infos[ref]:
+                                diff_ids: ${info.diff_ids}
+                                base: ${base_ref}
+                  except:
+                    as: e
+                    steps:
+                      - record_error:
+                          assign:
+                            - statuses[ref]:
+                                status: error
+                                step: resolve
+                                message: ${default(map.get(e, "message"), json.encode_to_string(e))}
+
+    # 3. The set to collect: requested digests that resolved, plus their bases.
+    - build_targets:
+        for:
+          value: ref
+          in: ${keys(infos)}
+          steps:
+            - new_requested:
+                switch:
+                  - condition: ${not(ref in targets)}
+                    assign:
+                      - targets[ref]:
+                          roles: []
+                          base_of: []
+                          base: null
+            - mark_requested:
+                assign:
+                  - targets[ref].roles: ${list.concat(targets[ref].roles, "requested")}
+                  - targets[ref].base: ${infos[ref].base}
+                  - base: ${infos[ref].base}
+            - has_base:
+                switch:
+                  - condition: ${base == null}
+                    next: continue
+            - new_base:
+                switch:
+                  - condition: ${not(base in targets)}
+                    assign:
+                      - targets[base]:
+                          roles: []
+                          base_of: []
+                          base: null
+            - add_base:
+                assign:
+                  - targets[base].base_of: ${list.concat(targets[base].base_of, ref)}
+            - mark_base:
+                switch:
+                  - condition: ${not("base" in targets[base].roles)}
+                    assign:
+                      - targets[base].roles: ${list.concat(targets[base].roles, "base")}
+
+    # 4. Collect each target.
+    - collect:
+        parallel:
+          shared: [statuses, objects, fatal]
+          concurrency_limit: 2
+          for:
+            value: ref
+            in: ${keys(targets)}
+            steps:
+              - collect_one:
+                  call: collect_digest
+                  args:
+                    ref: ${ref}
+                    target: ${targets[ref]}
+                    bucket: ${bucket}
+                    ingest_dt: ${ingest_dt}
+                    run: ${run}
+                    page_size: ${page_size}
+                  result: result
+              - record:
+                  assign:
+                    - statuses[ref]: ${result.status}
+              - add_objects:
+                  for:
+                    value: feed
+                    in: ${keys(result.objects)}
+                    steps:
+                      - append:
+                          assign:
+                            - objects[feed]: ${list.concat(objects[feed], result.objects[feed])}
+              - check_fatal:
+                  switch:
+                    - condition: ${result.status.status == "error" and result.status.step == "write"}
+                      assign:
+                        - fatal: ${list.concat(fatal, ref)}
+
+    - stop_on_fatal:
+        switch:
+          - condition: ${len(fatal) > 0}
+            raise:
+              message: "Writing to the bucket failed. No markers were written."
+              digests: ${fatal}
+
+    # 5. Markers, _SUCCESS last.
+    - write_markers:
+        for:
+          value: feed
+          in: ${feeds}
+          steps:
+            - meta:
+                assign:
+                  - prefix: ${"raw/" + feed + "/ingest_dt=" + ingest_dt + "/run=" + run}
+                  - meta:
+                      feed: ${feed}
+                      run: ${run}
+                      started: ${started_text}
+                      requested: ${requested}
+                      targets: ${targets}
+                      statuses: ${statuses}
+                      registry_projects: ${registry_projects}
+                      execution_id: ${execution_id}
+                      collector: "oci-vuln"
+                      collector_version: ${version}
+                      objects: ${objects[feed]}
+            - write_meta:
+                call: put_object
+                args:
+                  bucket: ${bucket}
+                  name: ${prefix + "/_meta.json"}
+                  content_type: "application/json"
+                  body: ${json.encode_to_string(meta)}
+            - write_success:
+                call: put_object
+                args:
+                  bucket: ${bucket}
+                  name: ${prefix + "/_SUCCESS"}
+                  content_type: "text/plain"
+                  body: ""
+            - clear_meta:
+                assign:
+                  - meta: null
+
+    - done:
+        return:
+          run: ${run}
+          targets: ${len(keys(targets))}
+          statuses: ${statuses}
+
+# Lists every Docker image in a project's repos in one region, with its
+# diff_ids, as base candidates.
+list_candidates:
+  params: [project, region]
+  steps:
+    - init:
+        assign:
+          - out: []
+    - list_repos:
+        call: http.get
+        args:
+          url: ${"https://artifactregistry.googleapis.com/v1/projects/" + project + "/locations/" + region + "/repositories"}
+          auth:
+            type: OAuth2
+        result: repos
+    - each_repo:
+        for:
+          value: repo
+          in: ${default(map.get(repos.body, "repositories"), [])}
+          steps:
+            - docker_only:
+                switch:
+                  - condition: ${repo.format != "DOCKER"}
+                    next: continue
+            - init_page:
+                assign:
+                  - token: ""
+            - list_images:
+                call: http.get
+                args:
+                  url: ${"https://artifactregistry.googleapis.com/v1/" + repo.name + "/dockerImages"}
+                  auth:
+                    type: OAuth2
+                  query:
+                    pageSize: 100
+                    pageToken: ${token}
+                result: images
+            - each_image:
+                for:
+                  value: image
+                  in: ${default(map.get(images.body, "dockerImages"), [])}
+                  steps:
+                    - info:
+                        try:
+                          call: image_info
+                          args:
+                            ref: ${image.uri}
+                          result: info
+                        except:
+                          as: e
+                          steps:
+                            - skip:
+                                next: continue
+                    - add:
+                        assign:
+                          - cand:
+                              ref: ${image.uri}
+                              diff_ids: ${info.diff_ids}
+                          - out: ${list.concat(out, cand)}
+                          - info: null
+            - next_page:
+                assign:
+                  - token: ${default(map.get(images.body, "nextPageToken"), "")}
+                  - images: null
+            - more:
+                switch:
+                  - condition: ${token != ""}
+                    next: list_images
+    - done:
+        return: ${out}
+
+# Fetches a digest's manifest and config. Follows the linux/amd64 entry of
+# an image index.
+image_info:
+  params: [ref]
+  steps:
+    - parse:
+        assign:
+          - at: ${text.find_all(ref, "@")[0].index}
+          - name: ${text.substring(ref, 0, at)}
+          - digest: ${text.substring(ref, at + 1, len(ref))}
+          - host: ${text.split(name, "/")[0]}
+          - path: ${text.substring(name, len(host) + 1, len(name))}
+          - base_url: ${"https://" + host + "/v2/" + path}
+          - index: null
+    - get_manifest:
+        call: http.get
+        args:
+          url: ${base_url + "/manifests/" + digest}
+          auth:
+            type: OAuth2
+          headers:
+            Accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
+        result: r
+    - decode_manifest:
+        assign:
+          - manifest: ${if(get_type(r.body) == "map", r.body, json.decode(r.body))}
+          - r: null
+    - is_index:
+        switch:
+          - condition: ${"manifests" in manifest}
+            next: follow_index
+        next: get_config
+    - follow_index:
+        for:
+          value: m
+          in: ${manifest.manifests}
+          steps:
+            - match_platform:
+                switch:
+                  - condition: ${map.get(m, "platform") != null and m.platform.os == "linux" and m.platform.architecture == "amd64"}
+                    steps:
+                      - keep_index:
+                          assign:
+                            - index:
+                                digest: ${digest}
+                                manifest: ${manifest}
+                            - digest: ${m.digest}
+                      - stop:
+                          next: break
+    - check_followed:
+        switch:
+          - condition: ${index == null}
+            raise: "Image index has no linux/amd64 manifest"
+    - get_platform_manifest:
+        call: http.get
+        args:
+          url: ${base_url + "/manifests/" + digest}
+          auth:
+            type: OAuth2
+          headers:
+            Accept: "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
+        result: r
+    - decode_platform_manifest:
+        assign:
+          - manifest: ${if(get_type(r.body) == "map", r.body, json.decode(r.body))}
+          - r: null
+    - get_config:
+        call: http.get
+        args:
+          url: ${base_url + "/blobs/" + manifest.config.digest}
+          auth:
+            type: OAuth2
+        result: c
+    - decode_config:
+        assign:
+          - config: ${if(get_type(c.body) == "map", c.body, json.decode(c.body))}
+          - c: null
+    - done:
+        return:
+          ref: ${ref}
+          platform_ref: ${name + "@" + digest}
+          index: ${index}
+          manifest: ${manifest}
+          config: ${config}
+          diff_ids: ${config.rootfs.diff_ids}
+
+# Returns the candidate whose diff_ids are the longest strict prefix of the
+# image's diff_ids, or null.
+find_base:
+  params: [info, candidates]
+  steps:
+    - init:
+        assign:
+          - best: null
+          - best_len: 0
+          - mine: ${info.diff_ids}
+    - each:
+        for:
+          value: cand
+          in: ${candidates}
+          steps:
+            - size_check:
+                switch:
+                  - condition: ${len(cand.diff_ids) >= len(mine) or len(cand.diff_ids) <= best_len}
+                    next: continue
+            - init_compare:
+                assign:
+                  - is_prefix: true
+            - compare:
+                for:
+                  value: i
+                  range: ${[0, len(cand.diff_ids) - 1]}
+                  steps:
+                    - differ:
+                        switch:
+                          - condition: ${cand.diff_ids[i] != mine[i]}
+                            steps:
+                              - not_prefix:
+                                  assign:
+                                    - is_prefix: false
+                              - stop:
+                                  next: break
+            - keep:
+                switch:
+                  - condition: ${is_prefix}
+                    assign:
+                      - best: ${cand.ref}
+                      - best_len: ${len(cand.diff_ids)}
+    - done:
+        return: ${best}
+
+# Writes one digest's oci-image line and pages its occurrences into the
+# Artifact Analysis feeds. Returns the digest's status and the objects it
+# wrote, by feed.
+collect_digest:
+  params: [ref, target, bucket, ingest_dt, run, page_size]
+  steps:
+    - init:
+        assign:
+          - step: info
+          - written:
+              oci-image: []
+              gcp-aa-vulnerability: []
+              gcp-aa-build: []
+              gcp-aa-discovery: []
+              gcp-aa-package: []
+          - short: ${text.substring(text.split(ref, "@sha256:")[1], 0, 12)}
+          - kinds:
+              VULNERABILITY: gcp-aa-vulnerability
+              BUILD: gcp-aa-build
+              DISCOVERY: gcp-aa-discovery
+              PACKAGE: gcp-aa-package
+    - run_steps:
+        try:
+          steps:
+            - get_info:
+                call: image_info
+                args:
+                  ref: ${ref}
+                result: info
+            - image_line:
+                assign:
+                  - step: write
+                  - name: ${"raw/oci-image/ingest_dt=" + ingest_dt + "/run=" + run + "/part-" + short + "-0.ndjson"}
+                  - line:
+                      digest: ${ref}
+                      platform_ref: ${info.platform_ref}
+                      roles: ${target.roles}
+                      base_of: ${target.base_of}
+                      base: ${target.base}
+                      index: ${info.index}
+                      manifest: ${info.manifest}
+                      config: ${info.config}
+                  - info: null
+            - write_image:
+                call: put_object
+                args:
+                  bucket: ${bucket}
+                  name: ${name}
+                  content_type: "application/x-ndjson"
+                  body: ${json.encode_to_string(line) + "\n"}
+            - record_image:
+                assign:
+                  - written["oci-image"]: ${list.concat(written["oci-image"], "gs://" + bucket + "/" + name)}
+                  - line: null
+                  - project: ${text.split(ref, "/")[1]}
+            - each_kind:
+                for:
+                  value: kind
+                  in: ${keys(kinds)}
+                  steps:
+                    - page_init:
+                        assign:
+                          - step: ${"occurrences " + kind}
+                          - token: ""
+                          - page: 0
+                    - get_page:
+                        call: http.get
+                        args:
+                          url: ${"https://containeranalysis.googleapis.com/v1/projects/" + project + "/occurrences"}
+                          auth:
+                            type: OAuth2
+                          query:
+                            filter: ${"resourceUri=\"https://" + ref + "\" AND kind=\"" + kind + "\""}
+                            pageSize: ${page_size}
+                            pageToken: ${token}
+                        result: r
+                    - to_lines:
+                        assign:
+                          - occs: ${default(map.get(r.body, "occurrences"), [])}
+                          - token: ${default(map.get(r.body, "nextPageToken"), "")}
+                          - r: null
+                          - body: ""
+                    - skip_empty:
+                        switch:
+                          - condition: ${len(occs) == 0}
+                            next: next_page
+                    - encode:
+                        for:
+                          value: o
+                          in: ${occs}
+                          steps:
+                            - add_line:
+                                assign:
+                                  - body: ${body + json.encode_to_string(o) + "\n"}
+                    - write_page:
+                        assign:
+                          - step: write
+                          - feed: ${kinds[kind]}
+                          - name: ${"raw/" + feed + "/ingest_dt=" + ingest_dt + "/run=" + run + "/part-" + short + "-" + string(page) + ".ndjson"}
+                          - occs: null
+                    - put_page:
+                        call: put_object
+                        args:
+                          bucket: ${bucket}
+                          name: ${name}
+                          content_type: "application/x-ndjson"
+                          body: ${body}
+                    - record_page:
+                        assign:
+                          - written[feed]: ${list.concat(written[feed], "gs://" + bucket + "/" + name)}
+                          - body: null
+                          - page: ${page + 1}
+                    - next_page:
+                        switch:
+                          - condition: ${token != ""}
+                            next: get_page
+        except:
+          as: e
+          steps:
+            - failed:
+                return:
+                  status:
+                    status: error
+                    step: ${step}
+                    roles: ${target.roles}
+                    base_of: ${target.base_of}
+                    message: ${default(map.get(e, "message"), json.encode_to_string(e))}
+                  objects: ${written}
+    - ok:
+        return:
+          status:
+            status: ok
+            roles: ${target.roles}
+            base_of: ${target.base_of}
+            base: ${target.base}
+          objects: ${written}
+
+# Creates one object with a simple media upload. The collector can only
+# create objects, so an existing name fails the write.
+put_object:
+  params: [bucket, name, content_type, body]
+  steps:
+    - upload:
+        call: http.post
+        args:
+          url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
+          auth:
+            type: OAuth2
+          query:
+            uploadType: media
+            name: ${name}
+            ifGenerationMatch: 0
+          headers:
+            Content-Type: ${content_type}
+          body: ${body}
+        retry: ${http.default_retry}
