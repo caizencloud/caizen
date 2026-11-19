@@ -81,7 +81,10 @@ main:
                     steps:
                       - record_failure:
                           assign:
-                            - failures: '${list.concat(failures, {"feed": feed, "error": e})}'
+                            - failure:
+                                feed: ${feed}
+                                error: ${e}
+                            - failures: ${list.concat(failures, failure)}
     - check_failures:
         switch:
           - condition: ${len(failures) > 0}
