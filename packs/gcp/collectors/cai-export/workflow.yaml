@@ -26,7 +26,8 @@ main:
     - init:
         assign:
           - started: ${math.floor(sys.now())}
-          - read_time: ${time.format(started)}
+          # time.format adds microseconds. Drop them so run= reads 20261120T060000Z.
+          - read_time: ${text.substring(time.format(started), 0, 19) + "Z"}
     - read_args:
         switch:
           - condition: ${args != null}

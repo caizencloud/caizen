@@ -33,7 +33,16 @@ for feed in ${FEEDS}; do
 
   rm -rf "${OUT}/raw/${feed}"
   mkdir -p "${OUT}/${rel}"
-  gcloud storage rsync --recursive --quiet "${run_dir}" "${OUT}/${rel}"
+  gcloud storage cp --quiet "${run_dir}/_meta.json" "${run_dir}/_SUCCESS" "${OUT}/${rel}/"
+
+  # Copy only the shards listed in _meta.json. CAI also writes a small
+  # placeholder object, containing the text "folder", at every directory
+  # level, and those would collide with real directories on disk.
+  jq -r '.objects[]' "${OUT}/${rel}/_meta.json" | while read -r uri; do
+    dest="${OUT}/${uri#gs://${BUCKET}/}"
+    mkdir -p "$(dirname "${dest}")"
+    gcloud storage cp --quiet "${uri}" "${dest}"
+  done
 
   if [ "${EXCLUDE_JSON}" != "[]" ] && [ -d "${OUT}/${rel}/data" ]; then
     find "${OUT}/${rel}/data" -type f | while read -r f; do
