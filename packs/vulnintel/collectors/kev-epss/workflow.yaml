@@ -94,17 +94,22 @@ fetch_feed:
         args:
           url: ${url}
         result: resolved
+    # Some servers break Workflows' client on HEAD, so read the total size
+    # from Content-Range on a one-byte GET.
     - head:
         try:
-          call: http.request
+          call: http.get
           args:
-            method: HEAD
             url: ${resolved.url}
+            headers:
+              Range: "bytes=0-0"
+              Accept-Encoding: identity
           result: h
         retry: ${http.default_retry}
     - read_headers:
         assign:
-          - size: ${int(default(map.get(h.headers, "Content-Length"), map.get(h.headers, "content-length")))}
+          - content_range: ${default(map.get(h.headers, "Content-Range"), map.get(h.headers, "content-range"))}
+          - size: ${int(text.split(content_range, "/")[1])}
           - etag: ${default(map.get(h.headers, "ETag"), map.get(h.headers, "etag"))}
           - last_modified: ${default(map.get(h.headers, "Last-Modified"), map.get(h.headers, "last-modified"))}
           - h: null
@@ -125,6 +130,7 @@ fetch_feed:
             url: ${final_url}
             headers:
               Range: ${"bytes=" + string(offset) + "-" + string(math.min(offset + chunk_bytes, size) - 1)}
+              Accept-Encoding: identity
           result: r
         retry: ${http.default_retry}
     - check_partial:
@@ -205,17 +211,18 @@ fetch_feed:
         return: ${meta}
 
 # Returns the URL a source redirects to, if any, and the file name to store.
-# Workflows may follow redirects itself, so a GET of the first byte is used
-# and a Location header is honored when present.
+# A Location header is honored when Workflows does not follow the redirect.
 final_name:
   params: [url]
   steps:
     - probe:
         try:
-          call: http.request
+          call: http.get
           args:
-            method: HEAD
             url: ${url}
+            headers:
+              Range: "bytes=0-0"
+              Accept-Encoding: identity
           result: p
         except:
           as: e
