@@ -11,7 +11,7 @@
 set -euo pipefail
 
 : "${BUCKET:?Set BUCKET to the Caizen data bucket}"
-FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy}"
+FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package}"
 EXCLUDE_ANCESTORS="${EXCLUDE_ANCESTORS:-}"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
