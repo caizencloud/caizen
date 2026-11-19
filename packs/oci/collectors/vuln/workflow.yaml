@@ -353,8 +353,12 @@ image_info:
             Accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
         result: r
     - decode_manifest:
+        call: as_map
+        args:
+          body: ${r.body}
+        result: manifest
+    - clear_decode_manifest:
         assign:
-          - manifest: ${if(get_type(r.body) == "map", r.body, json.decode(r.body))}
           - r: null
     - is_index:
         switch:
@@ -391,8 +395,12 @@ image_info:
             Accept: "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
         result: r
     - decode_platform_manifest:
+        call: as_map
+        args:
+          body: ${r.body}
+        result: manifest
+    - clear_decode_platform_manifest:
         assign:
-          - manifest: ${if(get_type(r.body) == "map", r.body, json.decode(r.body))}
           - r: null
     - get_config:
         call: http.get
@@ -402,8 +410,12 @@ image_info:
             Authorization: ${"Bearer " + token}
         result: c
     - decode_config:
+        call: as_map
+        args:
+          body: ${c.body}
+        result: config
+    - clear_decode_config:
         assign:
-          - config: ${if(get_type(c.body) == "map", c.body, json.decode(c.body))}
           - c: null
     - done:
         return:
@@ -617,3 +629,15 @@ put_object:
               Content-Type: ${content_type}
             body: ${body}
         retry: ${http.default_retry}
+
+# Returns a response body as a map. Workflows parses JSON bodies only for
+# some content types, and if() evaluates both branches, so use a switch.
+as_map:
+  params: [body]
+  steps:
+    - check:
+        switch:
+          - condition: ${get_type(body) == "map"}
+            return: ${body}
+    - decode:
+        return: ${json.decode(body)}
