@@ -1,0 +1,172 @@
+# Exports Cloud Asset Inventory snapshots to the Caizen data bucket.
+#
+# One execution exports every configured content type in parallel, all at
+# the same readTime. Each content type is its own feed:
+#
+#   raw/<feed>/ingest_dt=<arrival date>/run=<readTime>/data/<ASSET_TYPE>/<shard>
+#   raw/<feed>/ingest_dt=<arrival date>/run=<readTime>/_meta.json
+#   raw/<feed>/ingest_dt=<arrival date>/run=<readTime>/_SUCCESS
+#
+# _SUCCESS is written last. A feed whose export fails gets no _SUCCESS, the
+# other feeds still finish, and the execution fails at the end.
+#
+# Configuration comes from environment variables set by Terraform:
+#   SCOPE                 organizations/<id>, folders/<id>, or projects/<id>
+#   BUCKET                data bucket name
+#   CONTENT_TYPES         comma-separated, for example RESOURCE,IAM_POLICY,ORG_POLICY
+#   POLL_TIMEOUT_SECONDS  how long to wait for each export
+#   COLLECTOR_VERSION     recorded in _meta.json
+#
+# Optional argument: {"read_time": "2026-11-10T06:00:00Z"} for a backfill.
+# Cloud Asset Inventory accepts read times up to 35 days in the past.
+
+main:
+  params: [args]
+  steps:
+    - init:
+        assign:
+          - args: ${default(args, {})}
+          - started: ${math.floor(sys.now())}
+          - read_time: ${default(map.get(args, "read_time"), time.format(started))}
+          - ingest_dt: ${text.substring(time.format(started), 0, 10)}
+          - run: ${text.replace_all(text.replace_all(read_time, "-", ""), ":", "")}
+          - scope: ${sys.get_env("SCOPE")}
+          - bucket: ${sys.get_env("BUCKET")}
+          - content_types: ${text.split(sys.get_env("CONTENT_TYPES"), ",")}
+          - poll_timeout: ${int(sys.get_env("POLL_TIMEOUT_SECONDS"))}
+          - version: ${sys.get_env("COLLECTOR_VERSION")}
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - results: {}
+          - failures: []
+    - export_all:
+        parallel:
+          shared: [results, failures]
+          for:
+            value: content_type
+            in: ${content_types}
+            steps:
+              - feed_id:
+                  assign:
+                    - feed: ${"gcp-cai-" + text.replace_all(text.to_lower(content_type), "_", "-")}
+                    - prefix: ${"raw/" + feed + "/ingest_dt=" + ingest_dt + "/run=" + run}
+              - export_feed:
+                  try:
+                    steps:
+                      - run_export:
+                          call: export_feed
+                          args:
+                            feed: ${feed}
+                            prefix: ${prefix}
+                            content_type: ${content_type}
+                            scope: ${scope}
+                            bucket: ${bucket}
+                            read_time: ${read_time}
+                            poll_timeout: ${poll_timeout}
+                            version: ${version}
+                            execution_id: ${execution_id}
+                          result: meta
+                      - record_result:
+                          assign:
+                            - results[feed]: ${prefix}
+                  except:
+                    as: e
+                    steps:
+                      - record_failure:
+                          assign:
+                            - failures: '${list.concat(failures, {"feed": feed, "error": e})}'
+    - check_failures:
+        switch:
+          - condition: ${len(failures) > 0}
+            raise:
+              message: "One or more feeds failed"
+              failures: ${failures}
+              succeeded: ${results}
+    - done:
+        return:
+          read_time: ${read_time}
+          feeds: ${results}
+
+export_feed:
+  params: [feed, prefix, content_type, scope, bucket, read_time, poll_timeout, version, execution_id]
+  steps:
+    - start_export:
+        try:
+          call: http.post
+          args:
+            url: ${"https://cloudasset.googleapis.com/v1/" + scope + ":exportAssets"}
+            auth:
+              type: OAuth2
+            body:
+              readTime: ${read_time}
+              contentType: ${content_type}
+              outputConfig:
+                gcsDestination:
+                  uriPrefix: ${"gs://" + bucket + "/" + prefix + "/data"}
+          result: started
+        retry: ${http.default_retry}
+    - set_deadline:
+        assign:
+          - operation: ${started.body.name}
+          - deadline: ${sys.now() + poll_timeout}
+    - wait:
+        call: sys.sleep
+        args:
+          seconds: 10
+    - get_operation:
+        try:
+          call: http.get
+          args:
+            url: ${"https://cloudasset.googleapis.com/v1/" + operation}
+            auth:
+              type: OAuth2
+          result: op
+        retry: ${http.default_retry}
+    - check_done:
+        switch:
+          - condition: ${map.get(op.body, "done") == true}
+            next: check_error
+          - condition: ${sys.now() > deadline}
+            raise:
+              message: ${"Export did not finish within " + string(poll_timeout) + " seconds"}
+              operation: ${operation}
+        next: wait
+    - check_error:
+        switch:
+          - condition: ${"error" in op.body}
+            raise:
+              message: "Export failed"
+              operation: ${operation}
+              error: ${op.body.error}
+    - build_meta:
+        assign:
+          - meta:
+              feed: ${feed}
+              read_time: ${read_time}
+              scope: ${scope}
+              content_type: ${content_type}
+              asset_types: ["*"]
+              operation: ${operation}
+              execution_id: ${execution_id}
+              collector: "cai-export"
+              collector_version: ${version}
+              objects: ${op.body.response.outputResult.gcsResult.uris}
+    - write_meta:
+        try:
+          call: googleapis.storage.v1.objects.insert
+          args:
+            bucket: ${bucket}
+            name: ${prefix + "/_meta.json"}
+            uploadType: media
+            body: ${meta}
+        retry: ${http.default_retry}
+    - write_success:
+        try:
+          call: googleapis.storage.v1.objects.insert
+          args:
+            bucket: ${bucket}
+            name: ${prefix + "/_SUCCESS"}
+            uploadType: media
+            body: ""
+        retry: ${http.default_retry}
+    - return_meta:
+        return: ${meta}

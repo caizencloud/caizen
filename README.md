@@ -19,8 +19,8 @@ Caizen is an agent-first attack path analysis system for cloud environments. It 
 | Directory | Contents |
 |---|---|
 | `app/` | The Caizen service, written in Go, and its end-to-end tests |
-| `packs/` | Rules, feed definitions, and collectors, grouped by the system they talk to (GCP, GitHub, container registries) |
-| `terraform/` | Terraform for the platform, its environments, and the test org used as reference infrastructure to build and test collectors |
+| `packs/` | Rules, feed definitions, and collectors, grouped by the system they talk to (GCP, GitHub, container registries), with a Terraform module for each collector |
+| `terraform/` | Terraform modules that deploy the Caizen platform, called from each organization's own Terraform |
 | `docs/` | The docs site at [caizen.cloud](https://caizen.cloud), built with Hugo |
 
 ## Background
