@@ -26,7 +26,6 @@ resource "google_workflows_workflow" "this" {
     REGISTRY_PROJECTS = join(",", var.registry_projects)
     PAGE_SIZE         = tostring(var.page_size)
     COLLECTOR_VERSION = var.collector_version
-    SERVICE_ACCOUNT   = google_service_account.collector.email
   }
 
   depends_on = [google_project_service.this]

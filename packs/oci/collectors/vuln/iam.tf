@@ -41,10 +41,3 @@ resource "google_project_iam_member" "log_writer" {
   member  = google_service_account.collector.member
 }
 
-# Workflows attaches OAuth2 tokens only for *.googleapis.com hosts. The
-# Workflow mints a token for itself to call the *.docker.pkg.dev registry.
-resource "google_service_account_iam_member" "self_token" {
-  service_account_id = google_service_account.collector.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = google_service_account.collector.member
-}
