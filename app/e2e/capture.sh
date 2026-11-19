@@ -14,7 +14,7 @@
 set -euo pipefail
 
 : "${BUCKET:?Set BUCKET to the Caizen data bucket}"
-FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package cisa-kev first-epss}"
+FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package cisa-kev first-epss github-api}"
 EXCLUDE_ANCESTORS="${EXCLUDE_ANCESTORS:-}"
 
 command -v poltergeist >/dev/null || { echo "poltergeist is not on PATH. See github.com/ghostsecurity/poltergeist/releases." >&2; exit 1; }
