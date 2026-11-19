@@ -25,9 +25,17 @@ main:
   steps:
     - init:
         assign:
-          - args: ${default(args, {})}
           - started: ${math.floor(sys.now())}
-          - read_time: ${default(map.get(args, "read_time"), time.format(started))}
+          - read_time: ${time.format(started)}
+    - read_args:
+        switch:
+          - condition: ${args != null}
+            steps:
+              - override_read_time:
+                  assign:
+                    - read_time: ${default(map.get(args, "read_time"), read_time)}
+    - config:
+        assign:
           - ingest_dt: ${text.substring(time.format(started), 0, 10)}
           - run: ${text.replace_all(text.replace_all(read_time, "-", ""), ":", "")}
           - scope: ${sys.get_env("SCOPE")}
