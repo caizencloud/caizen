@@ -612,7 +612,7 @@ put_object:
               ifGenerationMatch: 0
             headers:
               Content-Type: ${content_type}
-            body: ${body}
+            body: ${text.encode(body)}
         retry: ${http.default_retry}
 
 # Returns a response body as a map. Workflows parses JSON bodies only for
