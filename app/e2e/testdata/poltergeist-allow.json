@@ -59,5 +59,11 @@
     "rule_id": "*",
     "path_prefix": "first-epss/",
     "reason": "Public FIRST EPSS scores. It cannot hold lonimbus secrets."
+  },
+  {
+    "rule_id": "ghost.generic.2",
+    "path": "github-api/part-0.ndjson",
+    "redacted": "secret_scanning_*****ries",
+    "reason": "Org settings field names in the /orgs/<org> response, such as secret_scanning_enabled_for_new_repositories: false. part-0 is always that response."
   }
 ]
