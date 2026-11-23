@@ -6,12 +6,19 @@ on:
     paths:
       - docs/**
       - .github/workflows/docs.yml
+# Pages deploys an uploaded artifact, so the site is never committed to a
+# branch and every branch can require signed commits.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
 env:
   HUGO_VERSION: 0.170.0
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,15 +33,15 @@ jobs:
           sudo dpkg -i "${RUNNER_TEMP}/hugo.deb"
       - name: Build
         run: make docs-build
-      - name: Publish to gh-pages
-        working-directory: docs/public
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          touch .nojekyll
-          git init -q -b gh-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "Deploy ${GITHUB_SHA}"
-          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/public
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
