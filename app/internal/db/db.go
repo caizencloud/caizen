@@ -171,11 +171,18 @@ func applySchema(ctx context.Context, conn *sql.DB) error {
 // loadGCS loads the gcs community extension and a secret that uses
 // Application Default Credentials. The container image pre-installs the
 // extension, so INSTALL makes no network call there.
+//
+// The extension caches glob listings for 60 seconds by default, so a pass
+// that a Pub/Sub message wakes soon after another would miss the new batch.
+// A TTL of 0 keeps a listing for under one second. It is set GLOBAL, because
+// a plain SET applies only to the pool connection that runs it. Object
+// metadata stays cached, because raw/ objects are never rewritten.
 func loadGCS(ctx context.Context, conn *sql.DB) error {
 	for _, stmt := range []string{
 		`INSTALL gcs FROM community`,
 		`LOAD gcs`,
 		`CREATE OR REPLACE SECRET caizen_gcs (TYPE gcp, PROVIDER credential_chain)`,
+		`SET GLOBAL gcs_list_cache_ttl = 0`,
 	} {
 		if _, err := conn.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("%s: %w", stmt, err)
