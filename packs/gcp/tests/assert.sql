@@ -121,10 +121,11 @@ FROM r JOIN rule_edge a
 WHERE NOT r.want
 UNION ALL
 -- Rule 03 is static: exists is 0.4, and traverse is the highest EPSS among
--- the network/no-UI CVEs of the serving images, raised to 0.9 when one of
--- them is in KEV. web: 0.20 and 0.55, none in KEV, so 0.55. The local CVE
--- (EPSS 0.97, KEV), the user-interaction CVE (0.80, KEV), and the CVE of
--- the 0% revision (0.99, KEV) must not count. shop: 0.20 and 0.05 in KEV,
+-- the network, no-privilege, no-UI CVEs of the serving images, raised to 0.9
+-- when one of them is in KEV. web: 0.20 and 0.55, none in KEV, so 0.55. The
+-- local CVE (EPSS 0.97, KEV), the user-interaction CVE (0.80, KEV), the
+-- low-privilege CVE (0.96, KEV), and the CVE of the 0% revision (0.99, KEV)
+-- must not count. shop: 0.20 and 0.05 in KEV,
 -- so 0.9.
 SELECT 'rule 03 confidence is wrong', x.k || ': exists ' || a.exists_confidence || ', traverse '
        || a.traverse_confidence || ', want 0.4 and ' || x.traverse

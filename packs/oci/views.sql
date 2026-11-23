@@ -23,6 +23,7 @@ CREATE VIEW oci_vulnerability AS
 SELECT data->>'$.resourceUri' AS image_id,
        regexp_extract(data->>'$.noteName', '/notes/(.+)$', 1) AS cve,
        data->>'$.vulnerability.cvssv3.attackVector' AS attack_vector,
+       data->>'$.vulnerability.cvssv3.privilegesRequired' AS privileges_required,
        data->>'$.vulnerability.cvssv3.userInteraction' AS user_interaction,
        data->>'$.vulnerability.effectiveSeverity' AS severity,
        TRY_CAST(data->>'$.vulnerability.cvssScore' AS DOUBLE) AS cvss

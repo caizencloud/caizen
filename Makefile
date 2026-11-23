@@ -7,8 +7,8 @@ help: ## Show this help
 build: ## Build the caizen binary into app/bin/caizen
 	cd app && go build -o bin/caizen ./cmd/caizen
 
-test: ## Run the Go tests (offline, against the frozen test data)
-	cd app && go test ./...
+test: ## Run the Go tests uncached (DuckDB reads packs and test data from C, which the Go test cache cannot see)
+	cd app && go test -count=1 ./...
 
 ingest: build ## Load app/e2e/testdata/raw and ./packs into app/bin/caizen.duckdb
 	app/bin/caizen ingest -raw app/e2e/testdata/raw -packs packs -db app/bin/caizen.duckdb
