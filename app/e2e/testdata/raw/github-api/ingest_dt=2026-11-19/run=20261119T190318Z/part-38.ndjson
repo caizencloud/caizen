@@ -1,1 +1,0 @@
-{"body":{"allowed_actions":"all","enabled":true,"sha_pinning_required":false},"endpoint":"/repos/lonimbus/api/actions/permissions","fetched_at":"2026-11-19T19:03:50Z","page":1,"params":{"page":1,"per_page":30},"status":200}

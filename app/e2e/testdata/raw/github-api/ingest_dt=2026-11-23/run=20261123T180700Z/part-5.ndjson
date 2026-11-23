@@ -1,0 +1,1 @@
+{"body":{"allowed_actions":"all","enabled_repositories":"all","sha_pinning_required":false},"endpoint":"/orgs/lonimbus/actions/permissions","page":1,"params":{"page":1,"per_page":30},"status":200}

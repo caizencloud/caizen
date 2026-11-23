@@ -1,1 +1,0 @@
-{"body":{"documentation_url":"https://docs.github.com/rest/repos/rules#get-all-repository-rulesets","message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"},"endpoint":"/repos/lonimbus/base-images/rulesets?includes_parents=true","fetched_at":"2026-11-19T19:03:56Z","page":1,"params":{"page":1,"per_page":30},"status":403}

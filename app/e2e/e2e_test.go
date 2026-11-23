@@ -39,9 +39,9 @@ func TestIngestFrozenCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The day after the capture, so the second pass lists the capture's
-	// ingest_dt partition again.
-	opts := ingest.Options{Raw: raw, Now: time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)}
+	// The day after the newest capture (github-api, 2026-11-23), so the second
+	// pass lists every captured ingest_dt partition again.
+	opts := ingest.Options{Raw: raw, Now: time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)}
 	rep, err := ingest.Run(ctx, d.DB, opts)
 	if err != nil {
 		t.Fatal(err)
