@@ -1,0 +1,8 @@
+{
+  "collector": "kev-epss",
+  "feed": "first-epss",
+  "date_released": null,
+  "objects": [
+    "gs://fixture-bucket/raw/first-epss/ingest_dt=2026-11-20/run=20261120T122000Z/data/epss_scores-2026-11-20.csv.gz"
+  ]
+}

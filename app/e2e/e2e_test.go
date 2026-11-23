@@ -1,5 +1,6 @@
 // Package e2e loads the frozen collector capture in testdata/raw with the
-// repo's packs and runs the checks in testdata/expected.
+// repo's packs, rebuilds and scores the model, and runs the checks in
+// testdata/expected.
 //
 // Each expected/*.sql file is a query that returns zero rows when its check
 // passes. The expectations come from the capture and the lonimbus plan,
@@ -16,7 +17,9 @@ import (
 
 	"github.com/caizencloud/caizen/app/internal/db"
 	"github.com/caizencloud/caizen/app/internal/ingest"
+	"github.com/caizencloud/caizen/app/internal/model"
 	"github.com/caizencloud/caizen/app/internal/pack"
+	"github.com/caizencloud/caizen/app/internal/score"
 )
 
 func TestIngestFrozenCapture(t *testing.T) {
@@ -48,6 +51,17 @@ func TestIngestFrozenCapture(t *testing.T) {
 	}
 	if len(rep.Batches) != 12 || len(rep.Skipped) != 0 {
 		t.Fatalf("first pass decided %d batches and skipped %v, want 12 and none", len(rep.Batches), rep.Skipped)
+	}
+
+	m, err := model.Rebuild(ctx, d.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Failed) > 0 {
+		t.Fatalf("pack queries failed: %v", m.Failed)
+	}
+	if _, err := score.Run(ctx, d.DB, score.Options{}); err != nil {
+		t.Fatal(err)
 	}
 
 	files, err := filepath.Glob("testdata/expected/*.sql")

@@ -1,0 +1,9 @@
+{
+  "collector": "cai-export",
+  "content_type": "RESOURCE",
+  "feed": "gcp-cai-resource",
+  "read_time": "2026-11-20T12:00:00Z",
+  "objects": [
+    "gs://fixture-bucket/raw/gcp-cai-resource/ingest_dt=2026-11-20/run=20261120T120000Z/data/resources.ndjson"
+  ]
+}

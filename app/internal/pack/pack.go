@@ -1,10 +1,13 @@
 // Package pack loads packs from a local directory or from a gs:// prefix
 // that holds one published pack digest.
 //
-// A pack is a directory with a pack.toml and optional SQL files. Packs load
-// in topological order over requires, with ties broken by ID. Today the
-// loader runs feeds.sql only. All reads go through DuckDB, so local and gs://
-// roots use the same code.
+// A pack is a directory with a pack.toml and optional SQL files:
+// vocabulary.sql, feeds.sql, views.sql, nodes.sql, and rules/*.sql. Packs
+// load in topological order over requires, with ties broken by ID, and
+// each pack's files load in that order. Rows a pack inserts must carry its
+// pack_id, and views and macros it creates must be named <pack>_*. The
+// loader stores nodes.sql and the rules for the model rebuild to run. All
+// reads go through DuckDB, so local and gs:// roots use the same code.
 package pack
 
 import (
@@ -40,8 +43,8 @@ type Pack struct {
 	Dir string `toml:"-"`
 }
 
-// Load reads every <root>/*/pack.toml, orders the packs, and replaces the
-// contents of feed_manifest with the rows from each pack's feeds.sql.
+// Load reads every <root>/*/pack.toml, orders the packs, and replaces every
+// pack row, view, and macro with those of the packs found.
 func Load(ctx context.Context, d *sql.DB, root string) ([]Pack, error) {
 	root = strings.TrimSuffix(root, "/")
 	packs, err := readPacks(ctx, d, root)
@@ -52,7 +55,7 @@ func Load(ctx context.Context, d *sql.DB, root string) ([]Pack, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := loadFeeds(ctx, d, ordered); err != nil {
+	if err := loadAll(ctx, d, ordered); err != nil {
 		return nil, err
 	}
 	return ordered, nil
@@ -132,54 +135,189 @@ func order(packs []Pack) ([]Pack, error) {
 	return out, nil
 }
 
-// loadFeeds runs each pack's feeds.sql in one transaction. Each pack may
-// insert rows only under its own pack_id.
-func loadFeeds(ctx context.Context, d *sql.DB, packs []Pack) error {
+// The SQL files a pack may hold, in load order. Rows each file inserts must
+// carry the pack's pack_id.
+var sqlFiles = []string{"vocabulary.sql", "feeds.sql", "views.sql"}
+
+// loadAll replaces every pack row, view, and macro in one transaction. For
+// each pack in order it runs vocabulary.sql, feeds.sql, and views.sql, and
+// stores nodes.sql and rules/*.sql for the model rebuild to run.
+func loadAll(ctx context.Context, d *sql.DB, packs []Pack) error {
 	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
+	if err := dropObjects(ctx, tx); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, query("clear")); err != nil {
 		return err
 	}
 	for _, p := range packs {
-		file := p.Dir + "/feeds.sql"
-		var n int
-		if err := tx.QueryRowContext(ctx, query("exists"), file).Scan(&n); err != nil {
+		if err := loadPack(ctx, tx, p); err != nil {
 			return err
-		}
-		if n == 0 {
-			continue
-		}
-		var content string
-		if err := tx.QueryRowContext(ctx, query("read_one"), file).Scan(&content); err != nil {
-			return fmt.Errorf("read %s: %w", file, err)
-		}
-
-		var before, after, own int
-		if err := tx.QueryRowContext(ctx, query("count")).Scan(&before); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, content); err != nil {
-			return fmt.Errorf("%s: %w", file, err)
-		}
-		if err := tx.QueryRowContext(ctx, query("counts"), p.ID).Scan(&after, &own); err != nil {
-			return err
-		}
-		if after-before != own {
-			return fmt.Errorf("%s: inserted rows under a pack_id other than %q", file, p.ID)
 		}
 	}
 
-	var dup sql.NullString
-	err = tx.QueryRowContext(ctx, query("duplicate")).Scan(&dup)
+	var problem, detail string
+	err = tx.QueryRowContext(ctx, query("invalid")).Scan(&problem, &detail)
 	if err == nil {
-		return fmt.Errorf("feed %q is declared more than once", dup.String)
+		return fmt.Errorf("%s: %s", problem, detail)
 	}
 	if err != sql.ErrNoRows {
 		return err
 	}
 	return tx.Commit()
+}
+
+func loadPack(ctx context.Context, tx *sql.Tx, p Pack) error {
+	for _, name := range sqlFiles {
+		file := p.Dir + "/" + name
+		content, ok, err := readOne(ctx, tx, file)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		before, err := objects(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if err := owned(ctx, tx, p.ID, file, func() error {
+			_, err := tx.ExecContext(ctx, content)
+			return err
+		}); err != nil {
+			return err
+		}
+		after, err := objects(ctx, tx)
+		if err != nil {
+			return err
+		}
+		for obj := range after {
+			if !before[obj] && !strings.HasPrefix(obj[strings.LastIndex(obj, " ")+1:], p.ID+"_") {
+				return fmt.Errorf("%s: %s is not named with the prefix %s_", file, obj, p.ID)
+			}
+		}
+	}
+
+	nodes, ok, err := readOne(ctx, tx, p.Dir+"/nodes.sql")
+	if err != nil {
+		return err
+	}
+	if ok {
+		if _, err := tx.ExecContext(ctx, query("query_insert"), p.ID, "nodes", "nodes", nodes); err != nil {
+			return err
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, query("read_files"), p.Dir+"/rules/*.sql")
+	if err != nil {
+		return fmt.Errorf("read %s/rules: %w", p.Dir, err)
+	}
+	type rule struct{ name, sql string }
+	var rules []rule
+	for rows.Next() {
+		var file, content string
+		if err := rows.Scan(&file, &content); err != nil {
+			rows.Close()
+			return err
+		}
+		rules = append(rules, rule{strings.TrimSuffix(file[strings.LastIndex(file, "/")+1:], ".sql"), content})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, r := range rules {
+		if _, err := tx.ExecContext(ctx, query("query_insert"), p.ID, "rule", r.name, r.sql); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// readOne returns a file's content, or ok=false when it does not exist.
+func readOne(ctx context.Context, tx *sql.Tx, file string) (string, bool, error) {
+	var n int
+	if err := tx.QueryRowContext(ctx, query("exists"), file).Scan(&n); err != nil {
+		return "", false, err
+	}
+	if n == 0 {
+		return "", false, nil
+	}
+	var content string
+	if err := tx.QueryRowContext(ctx, query("read_one"), file).Scan(&content); err != nil {
+		return "", false, fmt.Errorf("read %s: %w", file, err)
+	}
+	return content, true, nil
+}
+
+// owned runs fn and fails if it inserted rows under a pack_id other than
+// packID.
+func owned(ctx context.Context, tx *sql.Tx, packID, file string, fn func() error) error {
+	var before, ownBefore, after, ownAfter int
+	if err := tx.QueryRowContext(ctx, query("owned"), packID).Scan(&before, &ownBefore); err != nil {
+		return err
+	}
+	if err := fn(); err != nil {
+		return fmt.Errorf("%s: %w", file, err)
+	}
+	if err := tx.QueryRowContext(ctx, query("owned"), packID).Scan(&after, &ownAfter); err != nil {
+		return err
+	}
+	if after-before != ownAfter-ownBefore {
+		return fmt.Errorf("%s: inserted rows under a pack_id other than %q", file, packID)
+	}
+	return nil
+}
+
+// objects returns the views and macros in the main schema, as "KIND name".
+func objects(ctx context.Context, tx *sql.Tx) (map[string]bool, error) {
+	rows, err := tx.QueryContext(ctx, query("objects"))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var kind, name string
+		if err := rows.Scan(&kind, &name); err != nil {
+			return nil, err
+		}
+		out[kind+" "+name] = true
+	}
+	return out, rows.Err()
+}
+
+// dropObjects drops every view, then every macro, that a previous load
+// created. Packs create all of them.
+func dropObjects(ctx context.Context, tx *sql.Tx) error {
+	objs, err := objects(ctx, tx)
+	if err != nil {
+		return err
+	}
+	var views, macros []string
+	for obj := range objs {
+		if strings.HasPrefix(obj, "VIEW ") {
+			views = append(views, obj)
+		} else {
+			macros = append(macros, obj)
+		}
+	}
+	sort.Strings(views)
+	sort.Strings(macros)
+	for _, obj := range append(views, macros...) {
+		i := strings.LastIndex(obj, " ")
+		if _, err := tx.ExecContext(ctx, "DROP "+obj[:i]+" "+quoteIdent(obj[i+1:])); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func quoteIdent(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }

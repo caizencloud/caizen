@@ -1,0 +1,9 @@
+{
+  "collector": "kev-epss",
+  "feed": "cisa-kev",
+  "date_released": "2026-11-18T19:00:00.000Z",
+  "catalog_version": "2026.11.18",
+  "objects": [
+    "gs://fixture-bucket/raw/cisa-kev/ingest_dt=2026-11-20/run=20261120T122000Z/data/known_exploited_vulnerabilities.json"
+  ]
+}

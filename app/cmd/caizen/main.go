@@ -2,12 +2,14 @@
 //
 //	caizen serve    run the long-lived service
 //	caizen ingest   run one ingest pass against a raw root, then exit
+//	caizen tick     rebuild the model and score it once, then exit
 //
 // Every flag falls back to a CAIZEN_* environment variable.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,7 +21,9 @@ import (
 
 	"github.com/caizencloud/caizen/app/internal/db"
 	"github.com/caizencloud/caizen/app/internal/ingest"
+	"github.com/caizencloud/caizen/app/internal/model"
 	"github.com/caizencloud/caizen/app/internal/pack"
+	"github.com/caizencloud/caizen/app/internal/score"
 )
 
 const usage = `usage: caizen <command> [flags]
@@ -27,6 +31,7 @@ const usage = `usage: caizen <command> [flags]
 commands:
   serve    run the long-lived service
   ingest   run one ingest pass against a raw root, then exit
+  tick     rebuild the model and score it once, then exit
 
 Run "caizen <command> -h" for the command's flags.
 `
@@ -47,6 +52,8 @@ func main() {
 		err = serve(ctx, os.Args[2:])
 	case "ingest":
 		err = runIngest(ctx, os.Args[2:])
+	case "tick":
+		err = runTick(ctx, os.Args[2:])
 	case "-h", "-help", "--help", "help":
 		fmt.Print(usage)
 		return
@@ -60,7 +67,7 @@ func main() {
 	}
 }
 
-// config holds the settings shared by serve and ingest.
+// config holds the settings shared by the commands.
 type config struct {
 	raw   string
 	packs string
@@ -76,10 +83,11 @@ func (c *config) flags(fs *flag.FlagSet) {
 		"DuckDB file (CAIZEN_DB)")
 }
 
-func (c *config) check() error {
+// check fails when a flag the command needs is empty.
+func (c *config) check(needRaw bool) error {
 	var missing []string
 	for _, f := range []struct{ name, value string }{{"raw", c.raw}, {"packs", c.packs}, {"db", c.db}} {
-		if f.value == "" {
+		if f.value == "" && (needRaw || f.name != "raw") {
 			missing = append(missing, "-"+f.name)
 		}
 	}
@@ -112,7 +120,7 @@ func runIngest(ctx context.Context, args []string) error {
 	fs.Func("accept", "release a quarantined batch ID, such as gcp-cai-resource/ingest_dt=2026-11-19/run=20261119T060000Z (repeatable)",
 		func(s string) error { opts.Accept = append(opts.Accept, s); return nil })
 	fs.Parse(args)
-	if err := c.check(); err != nil {
+	if err := c.check(true); err != nil {
 		return err
 	}
 	d, err := c.open(ctx)
@@ -150,4 +158,55 @@ func runIngest(ctx context.Context, args []string) error {
 
 func serve(ctx context.Context, args []string) error {
 	return errors.New("serve is part of milestone 2 and is not built yet")
+}
+
+func runTick(ctx context.Context, args []string) error {
+	var c config
+	var opts score.Options
+	fs := flag.NewFlagSet("tick", flag.ExitOnError)
+	c.flags(fs)
+	top := fs.Int("top", 10, "print this many top chains and choke edges")
+	fs.IntVar(&opts.MaxHops, "max-hops", 8, "the most hops in a chain")
+	fs.Float64Var(&opts.Prune, "prune", 0.02, "drop a walk whose confidence falls to this or below")
+	fs.Parse(args)
+	if err := c.check(false); err != nil {
+		return err
+	}
+	d, err := c.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	if _, err := pack.Load(ctx, d.DB, c.packs); err != nil {
+		return err
+	}
+
+	m, err := model.Rebuild(ctx, d.DB)
+	if err != nil {
+		return err
+	}
+	for _, f := range m.Failed {
+		slog.Warn("pack query failed", "pack", f.Pack, "query", f.Name, "err", f.Err)
+	}
+	slog.Info("model rebuilt", "nodes", m.Nodes, "edges", m.Edges, "rejects", m.Rejects, "goals", m.Goals)
+
+	s, err := score.Run(ctx, d.DB, opts)
+	if err != nil {
+		return err
+	}
+	slog.Info("scored", "chains", s.Chains, "chokes", s.Chokes)
+
+	chains, chokes, err := score.Top(ctx, d.DB, *top)
+	if err != nil {
+		return err
+	}
+	out := json.NewEncoder(os.Stdout)
+	out.SetIndent("", "  ")
+	if err := out.Encode(map[string]any{"chains": chains, "chokes": chokes}); err != nil {
+		return err
+	}
+	if len(m.Failed) > 0 {
+		return fmt.Errorf("%d pack queries failed", len(m.Failed))
+	}
+	return nil
 }

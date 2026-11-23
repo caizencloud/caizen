@@ -1,3 +1,7 @@
+-- Where a fact comes from (ADR-0016): read from configuration, reported by
+-- an agent, or found by a scanner.
+CREATE TYPE provenance AS ENUM ('config', 'agent', 'static');
+
 -- Feed declarations. Packs fill this table from their feeds.sql at every
 -- start. Expressions are DuckDB SQL over the names json (one record), meta
 -- (the batch _meta.json), and obj (the source object: obj.filename).
@@ -15,7 +19,7 @@ CREATE TABLE feed_manifest (
     scopes       VARCHAR,                -- scoped snapshots: expression over meta for the scopes a batch covers
     required     VARCHAR[] NOT NULL DEFAULT [],  -- foreign-ID expressions; one NULL rejects the batch
     max_drop_pct DOUBLE,                 -- unscoped snapshots: quarantine below this drop
-    provenance   VARCHAR NOT NULL CHECK (provenance IN ('config', 'agent', 'static')),
+    provenance   provenance NOT NULL,
     CHECK ((scope IS NULL) = (scopes IS NULL)),
     CHECK (scope IS NULL OR kind = 'snapshot')
 );

@@ -1,0 +1,9 @@
+{
+  "collector": "github-repos",
+  "feed": "github-api",
+  "org": "acmeco",
+  "started": "2026-11-20T12:10:00Z",
+  "objects": [
+    "gs://fixture-bucket/raw/github-api/ingest_dt=2026-11-20/run=20261120T121000Z/part-0.ndjson"
+  ]
+}

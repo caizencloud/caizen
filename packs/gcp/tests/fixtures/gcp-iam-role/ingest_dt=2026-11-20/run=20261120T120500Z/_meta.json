@@ -1,0 +1,9 @@
+{
+  "collector": "iam-roles",
+  "feed": "gcp-iam-role",
+  "committed_at": "2026-11-15T07:31:41Z",
+  "source_repo": "darkbitio/gcp-iam-role-permissions",
+  "objects": [
+    "gs://fixture-bucket/raw/gcp-iam-role/ingest_dt=2026-11-20/run=20261120T120500Z/data/roles.ndjson"
+  ]
+}

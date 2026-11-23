@@ -1,0 +1,19 @@
+{
+  "collector": "oci-vuln",
+  "feed": "oci-image",
+  "started": "2026-11-20T12:15:00Z",
+  "statuses": {
+    "us-central1-docker.pkg.dev/acme-ops/base/python@sha256:1111111111111111111111111111111111111111111111111111111111111111": {
+      "status": "ok"
+    },
+    "us-central1-docker.pkg.dev/acme-web/apps/web@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+      "status": "ok"
+    },
+    "us-central1-docker.pkg.dev/acme-ops/tools/tools@sha256:9999999999999999999999999999999999999999999999999999999999999999": {
+      "status": "ok"
+    }
+  },
+  "objects": [
+    "gs://fixture-bucket/raw/oci-image/ingest_dt=2026-11-20/run=20261120T121500Z/part-0.ndjson"
+  ]
+}
