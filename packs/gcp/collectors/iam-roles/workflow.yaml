@@ -1,0 +1,310 @@
+# Downloads every predefined and basic GCP IAM role, with its permissions,
+# into the Caizen data bucket.
+#
+# Feed, of kind snapshot:
+#   gcp-iam-role  raw/gcp-iam-role/ingest_dt=<date>/run=<time>/data/gcp_roles_cai.json
+# The feed then gets _meta.json and _SUCCESS, written last.
+#
+# The source is SOURCE_PATH in the GitHub repo SOURCE_REPO, an NDJSON file
+# with one role per line that the repo's own Action regenerates from
+# `gcloud iam roles describe`. The Workflow resolves SOURCE_REF to a commit
+# SHA first and downloads the file at that SHA, so the file cannot change
+# between chunks. The commits endpoint is asked for the SHA alone, because
+# its full response lists every changed file and can exceed Workflows memory.
+#
+# Workflows limits all variables in an execution to 512 KB and one string to
+# 256 KB, so the file is fetched in Range chunks of CHUNK_BYTES. Each chunk is
+# written to tmp/iam-roles/<run>/, the chunks are joined with the Cloud
+# Storage compose call, and the result's size is checked against the
+# source's Content-Range. A lifecycle rule deletes tmp/ after one day.
+#
+# The chunk, compose, and upload subworkflows are copied from the kev-epss
+# collector, because Workflows cannot share subworkflows across files.
+#
+# Configuration comes from environment variables set by Terraform:
+#   BUCKET, SOURCE_REPO, SOURCE_PATH, SOURCE_REF, CHUNK_BYTES,
+#   COLLECTOR_VERSION
+
+main:
+  steps:
+    - init:
+        assign:
+          - started: ${math.floor(sys.now())}
+          - started_text: ${text.substring(time.format(started), 0, 19) + "Z"}
+          - ingest_dt: ${text.substring(started_text, 0, 10)}
+          - run: ${text.replace_all(text.replace_all(started_text, "-", ""), ":", "")}
+          - bucket: ${sys.get_env("BUCKET")}
+          - repo: ${sys.get_env("SOURCE_REPO")}
+          - source_path: ${sys.get_env("SOURCE_PATH")}
+          - ref: ${sys.get_env("SOURCE_REF")}
+          - chunk_bytes: ${int(sys.get_env("CHUNK_BYTES"))}
+          - version: ${sys.get_env("COLLECTOR_VERSION")}
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+          - feed: gcp-iam-role
+          - prefix: ${"raw/" + feed + "/ingest_dt=" + ingest_dt + "/run=" + run}
+          - tmp_prefix: ${"tmp/iam-roles/" + run}
+          - segs: ${text.split(source_path, "/")}
+          - object: ${prefix + "/data/" + segs[len(segs) - 1]}
+          - chunks: []
+          - offset: 0
+          - index: 0
+    - resolve_sha:
+        try:
+          call: http.get
+          args:
+            url: ${"https://api.github.com/repos/" + repo + "/commits/" + ref}
+            headers:
+              Accept: application/vnd.github.sha
+          result: s
+        retry: ${http.default_retry}
+    - read_sha:
+        assign:
+          - sha: ${s.body}
+    - sha_text:
+        switch:
+          - condition: ${get_type(sha) == "bytes"}
+            assign:
+              - sha: ${text.decode(sha)}
+    - check_sha:
+        switch:
+          - condition: ${not text.match_regex(sha, "^[0-9a-f]{40}$")}
+            raise: ${"Unexpected commit SHA from " + repo + ": " + sha}
+    - get_commit:
+        try:
+          call: http.get
+          args:
+            url: ${"https://api.github.com/repos/" + repo + "/git/commits/" + sha}
+          result: c
+        retry: ${http.default_retry}
+    - read_commit:
+        assign:
+          - committed_at: ${c.body.committer.date}
+          - c: null
+          - s: null
+          - source_url: ${"https://raw.githubusercontent.com/" + repo + "/" + sha + "/" + source_path}
+    # Read the total size from Content-Range on a one-byte GET.
+    - head:
+        try:
+          call: http.get
+          args:
+            url: ${source_url}
+            headers:
+              Range: "bytes=0-0"
+              Accept-Encoding: identity
+          result: h
+        retry: ${http.default_retry}
+    - read_headers:
+        assign:
+          - content_range: ${default(map.get(h.headers, "Content-Range"), map.get(h.headers, "content-range"))}
+          - size: ${int(text.split(content_range, "/")[1])}
+          - etag: ${default(map.get(h.headers, "ETag"), map.get(h.headers, "etag"))}
+          - h: null
+    - get_chunk:
+        try:
+          call: http.get
+          args:
+            url: ${source_url}
+            headers:
+              Range: ${"bytes=" + string(offset) + "-" + string(math.min(offset + chunk_bytes, size) - 1)}
+              Accept-Encoding: identity
+          result: r
+        retry: ${http.default_retry}
+    - check_partial:
+        switch:
+          - condition: ${r.code != 206}
+            raise: ${"Expected 206 Partial Content, got " + string(r.code) + " from " + source_url}
+    - put_chunk:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${tmp_prefix + "/" + string(index)}
+          content_type: "application/octet-stream"
+          body: ${r.body}
+    - next_chunk:
+        assign:
+          - r: null
+          - chunks: ${list.concat(chunks, tmp_prefix + "/" + string(index))}
+          - offset: ${offset + chunk_bytes}
+          - index: ${index + 1}
+    - more:
+        switch:
+          - condition: ${offset < size}
+            next: get_chunk
+    - join:
+        call: compose_all
+        args:
+          bucket: ${bucket}
+          sources: ${chunks}
+          destination: ${object}
+          tmp_prefix: ${tmp_prefix}
+          content_type: "application/x-ndjson"
+        result: joined
+    - check_size:
+        switch:
+          - condition: ${int(joined.size) != size}
+            raise: ${"Joined object is " + joined.size + " bytes; the source reported " + string(size)}
+    - meta:
+        assign:
+          - meta:
+              feed: ${feed}
+              run: ${run}
+              source_repo: ${repo}
+              source_ref: ${ref}
+              source_sha: ${sha}
+              committed_at: ${committed_at}
+              source_url: ${source_url}
+              etag: ${etag}
+              size: ${size}
+              chunks: ${len(chunks)}
+              execution_id: ${execution_id}
+              collector: "iam-roles"
+              collector_version: ${version}
+              objects: ${["gs://" + bucket + "/" + object]}
+    - write_meta:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_meta.json"}
+          content_type: "application/json"
+          body: ${json.encode_to_string(meta)}
+    - write_success:
+        call: put_object
+        args:
+          bucket: ${bucket}
+          name: ${prefix + "/_SUCCESS"}
+          content_type: "text/plain"
+          body: ""
+    - done:
+        return:
+          run: ${run}
+          source_sha: ${sha}
+          object: ${"gs://" + bucket + "/" + object}
+
+# Joins source objects into destination with the compose call, which takes
+# at most 32 sources. Longer lists are joined in steps through tmp_prefix.
+compose_all:
+  params: [bucket, sources, destination, tmp_prefix, content_type]
+  steps:
+    - init:
+        assign:
+          - pending: ${sources}
+          - step: 0
+    - loop:
+        switch:
+          - condition: ${len(pending) <= 32}
+            next: final
+    - partial:
+        assign:
+          - batch: []
+          - rest: []
+          - i: 0
+    - split:
+        for:
+          value: name
+          in: ${pending}
+          steps:
+            - place:
+                switch:
+                  - condition: ${i < 32}
+                    assign:
+                      - batch: ${list.concat(batch, name)}
+                  - condition: true
+                    assign:
+                      - rest: ${list.concat(rest, name)}
+            - count:
+                assign:
+                  - i: ${i + 1}
+    - join_batch:
+        call: compose
+        args:
+          bucket: ${bucket}
+          sources: ${batch}
+          destination: ${tmp_prefix + "/join-" + string(step)}
+          content_type: ${content_type}
+    - continue_loop:
+        assign:
+          - joined_name: ${tmp_prefix + "/join-" + string(step)}
+          - head: [""]
+          - head[0]: ${joined_name}
+          - pending: ${head}
+          - step: ${step + 1}
+    - append_rest:
+        for:
+          value: name
+          in: ${rest}
+          steps:
+            - add:
+                assign:
+                  - pending: ${list.concat(pending, name)}
+    - again:
+        next: loop
+    - final:
+        call: compose
+        args:
+          bucket: ${bucket}
+          sources: ${pending}
+          destination: ${destination}
+          content_type: ${content_type}
+        result: out
+    - done:
+        return: ${out}
+
+compose:
+  params: [bucket, sources, destination, content_type]
+  steps:
+    - build:
+        assign:
+          - source_objects: []
+    - each:
+        for:
+          value: name
+          in: ${sources}
+          steps:
+            - add:
+                assign:
+                  - entry:
+                      name: ${name}
+                  - source_objects: ${list.concat(source_objects, entry)}
+    - call_compose:
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/storage/v1/b/" + bucket + "/o/" + text.url_encode(destination) + "/compose"}
+            auth:
+              type: OAuth2
+            query:
+              ifGenerationMatch: 0
+            body:
+              sourceObjects: ${source_objects}
+              destination:
+                contentType: ${content_type}
+          result: r
+        retry: ${http.default_retry}
+    - done:
+        return: ${r.body}
+
+# Creates one object with a simple media upload. The collector can only
+# create objects, so an existing name fails the write.
+put_object:
+  params: [bucket, name, content_type, body]
+  steps:
+    - as_bytes:
+        switch:
+          - condition: ${get_type(body) == "string"}
+            assign:
+              - body: ${text.encode(body)}
+    - upload:
+        try:
+          call: http.post
+          args:
+            url: ${"https://storage.googleapis.com/upload/storage/v1/b/" + bucket + "/o"}
+            auth:
+              type: OAuth2
+            query:
+              uploadType: media
+              name: ${name}
+              ifGenerationMatch: 0
+            headers:
+              Content-Type: ${content_type}
+            body: ${body}
+        retry: ${http.default_retry}
