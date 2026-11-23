@@ -2,7 +2,7 @@
 WITH expected(feed_id) AS (VALUES
     ('gcp-cai-resource'), ('gcp-cai-iam-policy'), ('gcp-cai-org-policy'),
     ('oci-image'), ('gcp-aa-vulnerability'), ('gcp-aa-build'), ('gcp-aa-discovery'), ('gcp-aa-package'),
-    ('cisa-kev'), ('first-epss'), ('github-api'))
+    ('cisa-kev'), ('first-epss'), ('github-api'), ('gcp-iam-role'))
 SELECT 'batch not accepted' AS problem, batch_id AS detail FROM ledger WHERE status <> 'accepted'
 UNION ALL
 SELECT 'feed has no batch', e.feed_id FROM expected e

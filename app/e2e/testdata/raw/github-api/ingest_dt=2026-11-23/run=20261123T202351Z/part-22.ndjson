@@ -1,0 +1,1 @@
+{"body":{"documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","message":"Branch not protected","status":"404"},"endpoint":"/repos/lonimbus/infra/branches/main/protection","page":1,"params":{"page":1,"per_page":30},"status":404}

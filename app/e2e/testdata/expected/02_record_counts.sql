@@ -3,7 +3,7 @@ WITH expected(feed_id, n) AS (VALUES
     ('gcp-cai-resource', 262), ('gcp-cai-iam-policy', 21), ('gcp-cai-org-policy', 1),
     ('oci-image', 2), ('gcp-aa-vulnerability', 526), ('gcp-aa-build', 6),
     ('gcp-aa-discovery', 2), ('gcp-aa-package', 226),
-    ('cisa-kev', 1786), ('first-epss', 257), ('github-api', 55)),
+    ('cisa-kev', 1786), ('first-epss', 257), ('github-api', 55), ('gcp-iam-role', 49)),
 actual AS (SELECT feed_id, count(*) AS n FROM record WHERE valid_to IS NULL GROUP BY feed_id)
 SELECT e.feed_id, e.n AS expected, a.n AS actual
 FROM expected e FULL JOIN actual a USING (feed_id)

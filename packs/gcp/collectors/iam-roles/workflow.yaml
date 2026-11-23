@@ -82,7 +82,8 @@ main:
           - c: null
           - s: null
           - source_url: ${"https://raw.githubusercontent.com/" + repo + "/" + sha + "/" + source_path}
-    # Read the total size from Content-Range on a one-byte GET.
+    # Read the total size from Content-Range on a one-byte GET. The commit SHA
+    # pins the content, so no ETag is recorded.
     - head:
         try:
           call: http.get
@@ -97,7 +98,6 @@ main:
         assign:
           - content_range: ${default(map.get(h.headers, "Content-Range"), map.get(h.headers, "content-range"))}
           - size: ${int(text.split(content_range, "/")[1])}
-          - etag: ${default(map.get(h.headers, "ETag"), map.get(h.headers, "etag"))}
           - h: null
     - get_chunk:
         try:
@@ -153,7 +153,6 @@ main:
               source_sha: ${sha}
               committed_at: ${committed_at}
               source_url: ${source_url}
-              etag: ${etag}
               size: ${size}
               chunks: ${len(chunks)}
               execution_id: ${execution_id}

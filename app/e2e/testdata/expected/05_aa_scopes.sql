@@ -13,4 +13,4 @@ SELECT e.*, a.n AS actual FROM expected e FULL JOIN actual a USING (feed_id, dig
 WHERE e.n IS DISTINCT FROM a.n
 UNION ALL
 SELECT feed_id, scope, NULL, NULL FROM record
-WHERE feed_id LIKE 'gcp-aa-%' AND scope NOT LIKE 'us-central1-docker.pkg.dev/%@sha256:%'
+WHERE feed_id LIKE 'gcp-aa-%' AND scope NOT LIKE 'https://us-central1-docker.pkg.dev/%@sha256:%'

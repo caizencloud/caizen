@@ -26,8 +26,10 @@ func (e *inputError) Unwrap() error { return e.err }
 //  2. SHRED: evaluate the feed's expressions into _staged.
 //  3. VALIDATE: a failed required expression rejects the batch. Other
 //     failures and conflicting duplicates reject single records. An
-//     unscoped snapshot that shrank past max_drop_pct is quarantined.
-//  4. COMMIT: snapshot SCD merge or event append, then the ledger row.
+//     unscoped snapshot or latest batch that shrank past max_drop_pct is
+//     quarantined.
+//  4. COMMIT: snapshot SCD merge, event append, or latest replace, then the
+//     ledger row.
 //
 // A batch whose files are malformed (DuckDB Invalid Input or Conversion
 // errors during READ) is rejected. Any other error is returned for the
@@ -147,7 +149,7 @@ func (s *step) run(raw string) (Result, error) {
 		return Result{}, err
 	}
 	var note string
-	if s.f.Kind == "snapshot" && !s.f.scoped() && s.f.MaxDropPct.Valid {
+	if s.f.Kind != "event" && !s.f.scoped() && s.f.MaxDropPct.Valid {
 		reason, ok, err := s.gate(records)
 		if err != nil {
 			return Result{}, err
@@ -290,7 +292,7 @@ func (s *step) check() (int64, int64, error) {
 	return records, rejects, err
 }
 
-// gate applies the drop check to an unscoped snapshot. It returns ok=false
+// gate applies the drop check to an unscoped snapshot or a latest batch. It returns ok=false
 // to quarantine. A non-empty reason with ok=true explains an accept that
 // overrode the check.
 func (s *step) gate(records int64) (string, bool, error) {
@@ -330,13 +332,19 @@ func (s *step) gate(records int64) (string, bool, error) {
 	return fmt.Sprintf("%d records is more than %.0f%% below the last accepted batch's %d", records, pct, base), false, nil
 }
 
-// commit merges _s into record. The rules are in sql/event_*.sql and
-// sql/snapshot_*.sql.
+// commit merges _s into record. The rules are in sql/event_*.sql,
+// sql/latest_*.sql, and sql/snapshot_*.sql.
 func (s *step) commit() error {
-	if s.f.Kind == "event" {
+	switch s.f.Kind {
+	case "event":
 		return s.execAll(
 			stmt{query("event_move"), []any{s.f.ID, s.b.ID, s.b.Run}},
 			stmt{query("event_insert"), []any{s.f.ID, s.b.ID}},
+		)
+	case "latest":
+		return s.execAll(
+			stmt{query("latest_clear"), []any{s.f.ID}},
+			stmt{query("latest_insert"), []any{s.f.ID, s.b.ID}},
 		)
 	}
 	absent := stmt{query("snapshot_absent"), []any{s.f.ID, s.b.Run}}

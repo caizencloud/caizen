@@ -8,7 +8,7 @@ The source is `gcp_roles_cai.json` in `darkbitio/gcp-iam-role-permissions`. That
 
 1. Resolves `source_ref` to a commit SHA. It asks the commits endpoint for the SHA alone, because the full response lists every changed file and can exceed Workflows memory.
 2. Reads the commit time from `/git/commits/<sha>`.
-3. Reads the file's total size and ETag at that SHA with a one-byte `Range` request.
+3. Reads the file's total size at that SHA with a one-byte `Range` request.
 4. Downloads the file in `Range` requests of `chunk_bytes` and writes each chunk to `tmp/iam-roles/<run>/`. A URL at a fixed commit cannot change between chunks.
 5. Joins the chunks with the Cloud Storage `compose` call, in steps when there are more than 32.
 6. Fails if the joined object's size differs from the source's size.
@@ -26,7 +26,7 @@ A lifecycle rule from the platform module deletes `tmp/` objects after one day. 
 |---|---|
 | `gcp-iam-role` | `raw/gcp-iam-role/ingest_dt=<date>/run=<time>/data/gcp_roles_cai.json` |
 
-The feed is of kind `snapshot`. `_meta.json` holds the source repo, ref, commit SHA, commit time (`committed_at`), source URL, ETag, size, and chunk count. Custom roles are not in the source; Cloud Asset Inventory exports them as `iam.googleapis.com/Role`.
+The feed is of kind `snapshot`. `_meta.json` holds the source repo, ref, commit SHA, commit time (`committed_at`), source URL, size, and chunk count. Custom roles are not in the source; Cloud Asset Inventory exports them as `iam.googleapis.com/Role`.
 
 ## Inputs
 

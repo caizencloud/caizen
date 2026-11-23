@@ -1,10 +1,12 @@
 -- Feed declarations. Packs fill this table from their feeds.sql at every
 -- start. Expressions are DuckDB SQL over the names json (one record), meta
 -- (the batch _meta.json), and obj (the source object: obj.filename).
+-- A snapshot feed keeps SCD history, an event feed appends, and a latest
+-- feed keeps only its newest accepted batch.
 CREATE TABLE feed_manifest (
     feed_id      VARCHAR NOT NULL,
     pack_id      VARCHAR NOT NULL,
-    kind         VARCHAR NOT NULL CHECK (kind IN ('snapshot', 'event')),
+    kind         VARCHAR NOT NULL CHECK (kind IN ('snapshot', 'event', 'latest')),
     format       VARCHAR NOT NULL CHECK (format IN ('ndjson', 'json', 'csv')),
     record_path  VARCHAR,                -- JSON path that unnests records; NULL means one record per line or row
     identity     VARCHAR NOT NULL,       -- expression for record_id
@@ -34,7 +36,7 @@ CREATE TABLE ledger (
     feed_id   VARCHAR NOT NULL,
     ingest_dt DATE NOT NULL,
     run       TIMESTAMP NOT NULL,        -- batch time, UTC
-    status    VARCHAR NOT NULL CHECK (status IN ('accepted', 'quarantined', 'rejected')),
+    status    VARCHAR NOT NULL CHECK (status IN ('accepted', 'quarantined', 'rejected', 'superseded')),
     records   BIGINT NOT NULL,           -- distinct record IDs in the batch, valid or not; 0 if unreadable
     rejects   BIGINT NOT NULL,
     reason    VARCHAR,
@@ -43,7 +45,8 @@ CREATE TABLE ledger (
 
 -- Every feed lands here. Snapshot feeds keep one row per record per change,
 -- with valid_to set when the record changed or went absent. Event feeds
--- append rows that never close.
+-- append rows that never close. Latest feeds hold only the rows of their
+-- newest accepted batch, all open.
 CREATE TABLE record (
     feed_id    VARCHAR NOT NULL,
     record_id  VARCHAR NOT NULL,

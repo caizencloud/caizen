@@ -24,7 +24,7 @@ import (
 
 // SchemaVersion is the engine schema version. Increase it whenever a change
 // to schema/*.sql, or to any package's embedded DDL, needs a rebuild.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 //go:embed schema/*.sql
 var schemaFS embed.FS

@@ -46,8 +46,8 @@ func TestIngestFrozenCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Batches) != 11 || len(rep.Skipped) != 0 {
-		t.Fatalf("first pass decided %d batches and skipped %v, want 11 and none", len(rep.Batches), rep.Skipped)
+	if len(rep.Batches) != 12 || len(rep.Skipped) != 0 {
+		t.Fatalf("first pass decided %d batches and skipped %v, want 12 and none", len(rep.Batches), rep.Skipped)
 	}
 
 	files, err := filepath.Glob("testdata/expected/*.sql")

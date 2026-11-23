@@ -3,7 +3,8 @@
 // A batch is one raw/<feed>/ingest_dt=<date>/run=<time>/ prefix that holds a
 // _SUCCESS marker. Run discovers batches for every feed in feed_manifest,
 // skips batches already in the ledger, and loads the rest in run order. Each
-// batch commits in one transaction.
+// batch commits in one transaction. A feed of kind latest loads only its
+// newest batch and records the others as superseded.
 //
 // A feed's history is complete when a pass has listed its whole history and
 // decided every batch in it. Until then, discovery lists the whole history;
@@ -67,7 +68,7 @@ type Report struct {
 type Result struct {
 	Batch   string
 	Feed    string
-	Status  string // accepted, quarantined, or rejected
+	Status  string // accepted, quarantined, rejected, or superseded
 	Records int64
 	Rejects int64
 	Reason  string
@@ -231,6 +232,22 @@ func (l *loader) runFeed(ctx context.Context, f feed, reconcile, rebuild bool) (
 		}
 		complete = false
 	}
+	load := l.loadAll
+	if f.Kind == "latest" {
+		load = l.loadLatest
+	}
+	out, err := load(ctx, f, todo)
+	if err != nil {
+		return out, err
+	}
+	if !complete {
+		return out, l.setComplete(ctx, f.ID, true)
+	}
+	return out, nil
+}
+
+// loadAll loads every batch in run order.
+func (l *loader) loadAll(ctx context.Context, f feed, todo []batch) ([]Result, error) {
 	var out []Result
 	for _, b := range todo {
 		r, err := l.load(ctx, f, b)
@@ -239,8 +256,47 @@ func (l *loader) runFeed(ctx context.Context, f feed, reconcile, rebuild bool) (
 		}
 		out = append(out, r)
 	}
-	if !complete {
-		return out, l.setComplete(ctx, f.ID, true)
+	return out, nil
+}
+
+// loadLatest loads only the newest new batch of a latest feed, and an older
+// one only when every newer one is rejected. Every other new batch, and any
+// batch not newer than the last accepted one, is recorded as superseded
+// without being read.
+func (l *loader) loadLatest(ctx context.Context, f feed, todo []batch) ([]Result, error) {
+	var records int64
+	var lastRun time.Time
+	err := l.conn.QueryRowContext(ctx, query("gate_last_accepted"), f.ID).Scan(&records, &lastRun)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	results := map[string]Result{}
+	first := len(todo) // todo[first:] went through load
+	for i := len(todo) - 1; i >= 0 && todo[i].Run.After(lastRun); i-- {
+		r, err := l.load(ctx, f, todo[i])
+		if err != nil {
+			return nil, err
+		}
+		results[r.Batch] = r
+		first = i
+		if r.Status != "rejected" {
+			break
+		}
+	}
+	for _, b := range todo[:first] {
+		r := Result{Batch: b.ID, Feed: f.ID, Status: "superseded", Reason: "a newer batch of this latest feed was decided"}
+		if _, err := l.conn.ExecContext(ctx, query("ledger_insert"), ledgerArgs(b, r)...); err != nil {
+			return nil, err
+		}
+		results[r.Batch] = r
+	}
+
+	out := make([]Result, 0, len(results))
+	for _, b := range todo {
+		if r, ok := results[b.ID]; ok {
+			out = append(out, r)
+		}
 	}
 	return out, nil
 }

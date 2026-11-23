@@ -61,8 +61,8 @@ func TestLoadRepoPacks(t *testing.T) {
 	if err := d.QueryRow(`SELECT count(*) FROM feed_manifest`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 11 {
-		t.Fatalf("feeds = %d, want 11", n)
+	if n != 12 {
+		t.Fatalf("feeds = %d, want 12", n)
 	}
 	// A second load replaces the rows instead of adding to them.
 	if _, err := Load(ctx, d.DB, root); err != nil {
@@ -71,8 +71,8 @@ func TestLoadRepoPacks(t *testing.T) {
 	if err := d.QueryRow(`SELECT count(*) FROM feed_manifest`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 11 {
-		t.Fatalf("feeds after reload = %d, want 11", n)
+	if n != 12 {
+		t.Fatalf("feeds after reload = %d, want 12", n)
 	}
 }
 

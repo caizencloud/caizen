@@ -625,3 +625,48 @@ func TestObjectsThatIsNotAListRejectsBatch(t *testing.T) {
 	}
 	want(t, f.rows("aa"), []string{"a1 11-20 06:00 - - -"})
 }
+
+const latestFeed = `INSERT INTO feed_manifest
+	(feed_id, pack_id, kind, format, identity, valid_from, required, max_drop_pct, provenance)
+	VALUES ('lat', 'test', 'latest', 'ndjson', $$json->>'$.id'$$, $$meta->>'$.read_time'$$, [], 25, 'config')`
+
+func TestLatestLoadsOnlyNewestBatch(t *testing.T) {
+	f := newFixture(t, latestFeed)
+	f.batch("lat", "20261120T060000Z", nil, `{"id":"a","v":1}`, `{"id":"b","v":1}`)
+	f.batch("lat", "20261121T060000Z", nil, `{"id":"a","v":2}`, `{"id":"b","v":2}`)
+	f.batch("lat", "20261122T060000Z", nil, `{"id":"a","v":3}`, `{"id":"b","v":3}`)
+	rs := f.run(Options{})
+	want(t, statuses(rs), []string{"superseded", "superseded", "accepted"})
+	want(t, f.rows("lat"), []string{"a 11-22 06:00 - - 3", "b 11-22 06:00 - - 3"})
+
+	// A newer batch replaces every row, and no history is kept.
+	f.batch("lat", "20261123T060000Z", nil, `{"id":"a","v":4}`, `{"id":"c","v":4}`)
+	want(t, statuses(f.run(Options{})), []string{"accepted"})
+	want(t, f.rows("lat"), []string{"a 11-23 06:00 - - 4", "c 11-23 06:00 - - 4"})
+
+	// A batch that arrives late, older than the last accepted one, is
+	// superseded without being read.
+	f.batch("lat", "20261121T120000Z", nil, `{"id":"z","v":9}`)
+	want(t, statuses(f.run(Options{})), []string{"superseded"})
+	want(t, f.rows("lat"), []string{"a 11-23 06:00 - - 4", "c 11-23 06:00 - - 4"})
+}
+
+func TestLatestFallsBackPastRejectedBatch(t *testing.T) {
+	f := newFixture(t, latestFeed)
+	f.batch("lat", "20261120T060000Z", nil, `{"id":"a","v":1}`)
+	f.batch("lat", "20261121T060000Z", nil, `{"id":"a","v":2}`)
+	f.batch("lat", "20261122T060000Z", nil, `{"id":`)
+	want(t, statuses(f.run(Options{})), []string{"superseded", "accepted", "rejected"})
+	want(t, f.rows("lat"), []string{"a 11-21 06:00 - - 2"})
+}
+
+func TestLatestQuarantinesLargeDrop(t *testing.T) {
+	f := newFixture(t, latestFeed)
+	f.batch("lat", "20261120T060000Z", nil, ids(4)...)
+	f.run(Options{})
+	f.batch("lat", "20261121T060000Z", nil, ids(2)...)
+	want(t, statuses(f.run(Options{})), []string{"quarantined"})
+	if n := len(f.rows("lat")); n != 4 {
+		t.Fatalf("rows after quarantine = %d, want the 4 accepted ones", n)
+	}
+}

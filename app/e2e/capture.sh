@@ -3,7 +3,8 @@
 # into app/e2e/testdata/raw/, keeping the raw/ layout. Records whose
 # ancestors include any EXCLUDE_ANCESTORS entry are dropped. The EPSS file
 # is cut down to the CVEs in the captured gcp-aa-vulnerability feed, plus
-# its header lines, to keep the test data small. The capture
+# its header lines, and the role file to the roles that the captured IAM
+# policies bind, to keep the test data small. The capture
 # fails if Poltergeist (github.com/ghostsecurity/poltergeist) finds a secret
 # that is not in app/e2e/testdata/poltergeist-allow.json.
 #
@@ -14,7 +15,7 @@
 set -euo pipefail
 
 : "${BUCKET:?Set BUCKET to the Caizen data bucket}"
-FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package cisa-kev first-epss github-api}"
+FEEDS="${FEEDS:-gcp-cai-resource gcp-cai-iam-policy gcp-cai-org-policy oci-image gcp-aa-vulnerability gcp-aa-build gcp-aa-discovery gcp-aa-package cisa-kev first-epss github-api gcp-iam-role}"
 EXCLUDE_ANCESTORS="${EXCLUDE_ANCESTORS:-}"
 
 command -v poltergeist >/dev/null || { echo "poltergeist is not on PATH. See github.com/ghostsecurity/poltergeist/releases." >&2; exit 1; }
@@ -71,6 +72,17 @@ if [ -n "${epss}" ]; then
   mv "${epss}.tmp" "${epss}"
   echo "EPSS cut to $(gzip -dc "${epss}" | grep -c '^CVE-') rows for $(wc -l < "${cves}" | tr -d ' ') CVEs"
   rm -f "${cves}"
+fi
+
+# The role file holds every predefined role (about 2,400 roles, 8 MB). Keep
+# only the roles that the captured IAM policies bind.
+roles_file="$(find "${OUT}/raw/gcp-iam-role" -path '*/data/*' -type f 2>/dev/null | head -1)"
+if [ -n "${roles_file}" ]; then
+  bound="$(find "${OUT}/raw/gcp-cai-iam-policy" -path '*/data/*' -type f -exec cat {} + \
+    | jq -c '[.iam_policy.bindings[]?.role]' | jq -sc 'add | unique')"
+  jq -c --argjson bound "${bound}" 'select(.name | IN($bound[]))' "${roles_file}" > "${roles_file}.tmp"
+  mv "${roles_file}.tmp" "${roles_file}"
+  echo "Roles cut to $(wc -l < "${roles_file}" | tr -d ' ') of the $(echo "${bound}" | jq length) bound roles"
 fi
 
 # Poltergeist exits 1 when it finds anything, so read its JSON instead of

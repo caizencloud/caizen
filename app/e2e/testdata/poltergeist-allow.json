@@ -65,5 +65,10 @@
     "path": "github-api/part-0.ndjson",
     "redacted": "secret_scanning_*****ries",
     "reason": "Org settings field names in the /orgs/<org> response, such as secret_scanning_enabled_for_new_repositories: false. part-0 is always that response."
+  },
+  {
+    "rule_id": "*",
+    "path_prefix": "gcp-iam-role/",
+    "reason": "Public predefined GCP IAM role definitions from darkbitio/gcp-iam-role-permissions. It cannot hold lonimbus secrets. Permission names in roles/editor and roles/owner match ghost.harness.3."
   }
 ]
