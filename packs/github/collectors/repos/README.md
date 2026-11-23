@@ -15,8 +15,10 @@ Terraform module that collects one GitHub organization into the Caizen data buck
 Feed `github-api`, kind `snapshot`. Each line is one API response page:
 
 ```
-{"endpoint": "...", "params": {...}, "page": 1, "status": 200, "fetched_at": "...", "body": ...}
+{"endpoint": "...", "params": {...}, "page": 1, "status": 200, "body": ...}
 ```
+
+The batch time is `started` in `_meta.json`. Lines carry no timestamp of their own, so an unchanged page produces an identical line on every run.
 
 Each page is its own part object: `raw/github-api/ingest_dt=<date>/run=<time>/part-<n>.ndjson`, followed by `_meta.json` and `_SUCCESS`.
 
@@ -29,7 +31,7 @@ The module creates an empty Secret Manager secret, `github-token`. Create a fine
 | Level | Permissions |
 |---|---|
 | Repository | Metadata, Administration, Contents, Actions, Webhooks |
-| Organization | Members, Administration |
+| Organization | Members, Administration, Webhooks |
 
 Then add it, so the value never enters Terraform state:
 

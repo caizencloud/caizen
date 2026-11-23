@@ -3,12 +3,16 @@
 #
 # Input: {"digests": ["us-central1-docker.pkg.dev/<project>/<repo>/<image>@sha256:<hex>", ...]}
 #
-# Feeds, all of kind event (a run covers only the digests it was given):
+# Feeds (a run covers only the digests it was given):
 #   oci-image             one line per digest: manifest and config
 #   gcp-aa-vulnerability  one line per VULNERABILITY occurrence
 #   gcp-aa-build          one line per BUILD occurrence
 #   gcp-aa-discovery      one line per DISCOVERY occurrence
 #   gcp-aa-package        one line per PACKAGE occurrence
+#
+# oci-image is an event feed. The gcp-aa-* feeds are snapshots scoped by
+# digest: each run holds the complete occurrence set for every digest that
+# _meta.json .statuses marks ok.
 #
 # Each feed writes raw/<feed>/ingest_dt=<date>/run=<time>/part-<digest12>-<page>.ndjson,
 # then _meta.json, then _SUCCESS last.

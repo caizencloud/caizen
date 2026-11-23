@@ -9,3 +9,8 @@
 docs/public/
 docs/resources/
 .hugo_build.lock
+
+# go
+app/bin/
+*.duckdb
+*.duckdb.wal

@@ -2,7 +2,7 @@
 # protection, and automation into the Caizen data bucket.
 #
 # Feed github-api, kind snapshot. Each line is one API response page:
-#   {"endpoint", "params", "page", "status", "fetched_at", "body"}
+#   {"endpoint", "params", "page", "status", "body"}
 # written to raw/github-api/ingest_dt=<date>/run=<time>/part-<n>.ndjson,
 # then _meta.json, then _SUCCESS last.
 #
@@ -338,7 +338,6 @@ fetch:
                 page: ${page}
               page: ${page}
               status: ${r.code}
-              fetched_at: ${text.substring(time.format(sys.now()), 0, 19) + "Z"}
               body: ${r.body}
           - name: ${prefix + "/part-" + string(st.seq) + ".ndjson"}
     - write:

@@ -16,30 +16,29 @@ flowchart LR
   COL -->|raw batches| B[(GCS bucket)]
   AG[Agents] -->|evidence| B
   B --> S[Caizen service]
-  S -->|curated data| B
   S -->|dispatch| AG
   U[Users and agents] -->|IAP| S
 ```
 
 ## Service
 
-The service runs as one container on a Container-Optimized OS VM. A single process provides the API, the web UI, data loading, scoring, and agent scheduling. It is the only writer of curated data. Identity-Aware Proxy handles authentication for users and machine clients.
+The service runs as one container on a Container-Optimized OS VM. A single process provides the API, the web UI, data loading, scoring, and agent scheduling. It is the only process that writes to its database. Identity-Aware Proxy handles authentication for users and machine clients.
 
 ## Storage
 
-The service stores all durable state in a GCS bucket. Collectors and agents write their output under `raw/`, and nothing modifies it afterward. The service derives Parquet files under `curated/` from `raw/` and can rebuild them at any time.
+The service stores all durable state in a GCS bucket. Collectors and agents write their output under `raw/`, and nothing modifies it afterward. The service reads `raw/` directly with DuckDB through the `gcs` extension, which authenticates with the VM's service account. It writes no derived data back to the bucket.
 
-DuckDB on the VM's local disk is a cache. Losing the VM causes downtime but no data loss.
+The DuckDB file on the VM's disk is the only derived store. It holds the load history, rejected records, resource history, and the graph. A new VM rebuilds the file by replaying `raw/` in batch order, so `raw/` is never deleted. Losing the VM causes downtime but no data loss. A schema change also rebuilds the file, so the service needs no migrations.
 
 ## Collectors
 
-Collectors retrieve data from GCP, Container Analysis, and GitHub. Most collectors are Cloud Run jobs started by Cloud Workflows.
+Collectors retrieve data from GCP, Container Analysis, and GitHub. Each collector is a Cloud Workflow, started by Cloud Scheduler or run by hand.
 
-Each run writes its files under its own `raw/` prefix and writes a `_SUCCESS` marker when it finishes. A Pub/Sub notification tells the service that a new batch is ready.
+Each run writes its files under its own `raw/` prefix and writes a `_SUCCESS` marker when it finishes. The service finds new batches by listing each feed's last 7 days of `ingest_dt=` partitions every hour and skipping batches it has already loaded. A Pub/Sub notification for each new object under `raw/` starts that listing early, so a batch usually loads within seconds. A lost notification only delays loading until the next hourly pass. A feed whose history has not fully loaded, such as a new feed or one on a rebuilt VM, lists its whole history on every pass until it has. After more than 7 days of downtime, an operator runs a reconcile pass that lists each feed's whole history.
 
 ## Processing loop
 
-The service runs a processing loop when a batch arrives and on a timer. Each pass applies the rules, incorporates new evidence, applies confidence decay, scores paths, ranks fixes, and selects the edges that are due for a re-check.
+One goroutine owns the database connection that writes. It loads every ready batch and then runs a pass. It also runs a pass on a timer, because confidence decay changes scores when no data arrives. Each pass applies the rules, incorporates new evidence, applies confidence decay, scores paths, ranks fixes, and selects the edges that are due for a re-check. API requests use read-only connections and the results of the last pass.
 
 ## Agent dispatch
 

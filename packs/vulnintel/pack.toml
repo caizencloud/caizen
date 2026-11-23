@@ -1,0 +1,4 @@
+id = "vulnintel"
+version = "0.1.0"
+license = "FSL-1.1-ALv2"
+requires = ["core"]

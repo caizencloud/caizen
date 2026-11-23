@@ -1,8 +1,17 @@
 .DEFAULT_GOAL := help
-.PHONY: help docs-serve docs-build testdata-capture
+.PHONY: help build test ingest docs-serve docs-build testdata-capture
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+build: ## Build the caizen binary into app/bin/caizen
+	cd app && go build -o bin/caizen ./cmd/caizen
+
+test: ## Run the Go tests (offline, against the frozen test data)
+	cd app && go test ./...
+
+ingest: build ## Load app/e2e/testdata/raw and ./packs into app/bin/caizen.duckdb
+	app/bin/caizen ingest -raw app/e2e/testdata/raw -packs packs -db app/bin/caizen.duckdb
 
 docs-serve: ## Serve the docs site at http://localhost:1313 with live reload
 	cd docs && hugo server --buildDrafts --disableFastRender --noHTTPCache --renderToMemory
