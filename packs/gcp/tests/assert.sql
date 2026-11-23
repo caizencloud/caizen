@@ -29,6 +29,10 @@ WITH n(k, id) AS (VALUES
     ('auditor_sa',     'https://iam.googleapis.com/projects/acme-ops/serviceAccounts/auditor-sa@acme-ops.iam.gserviceaccount.com'),
     ('projadmin_sa',   'https://iam.googleapis.com/projects/acme-ops/serviceAccounts/projadmin-sa@acme-ops.iam.gserviceaccount.com'),
     ('editor_sa',      'https://iam.googleapis.com/projects/acme-data/serviceAccounts/editor-sa@acme-data.iam.gserviceaccount.com'),
+    ('webkeys_sa',     'https://iam.googleapis.com/projects/acme-web/serviceAccounts/webkeys-sa@acme-web.iam.gserviceaccount.com'),
+    ('minter_sa',      'https://iam.googleapis.com/projects/acme-web/serviceAccounts/minter-sa@acme-web.iam.gserviceaccount.com'),
+    ('runner_sa',      'https://iam.googleapis.com/projects/acme-web/serviceAccounts/runner-sa@acme-web.iam.gserviceaccount.com'),
+    ('datakeys_sa',    'https://iam.googleapis.com/projects/acme-data/serviceAccounts/datakeys-sa@acme-data.iam.gserviceaccount.com'),
     ('analyst',        'principal://goog/subject/analyst@acme.test'),
     ('exports',        'https://storage.googleapis.com/acme-web-exports'),
     ('exports_c',      'https://storage.googleapis.com/acme-web-exports#contents'),
@@ -84,12 +88,20 @@ e(rule, src, dst, want, why) AS (VALUES
     ('09-privesc-impersonation-1hop', 'keys_sa', 'web_sa',       false, 'key admin on acme-ops does not reach SAs in acme-web'),
     ('09-privesc-impersonation-1hop', 'ci_sa',   'web_sa',       false, 'actAs on web-sa, but builds.create only in acme-ops, not acme-web'),
     ('09-privesc-impersonation-1hop', 'ci_sa',   'keys_sa',      false, 'builds.create in acme-ops, but no actAs on keys-sa'),
-    ('09-privesc-impersonation-1hop', 'half_sa', '*',            false, 'actAs on shop-sa without cloudbuild.builds.create'),
-    ('09-privesc-impersonation-1hop', 'editor_sa', '*',          false, 'roles/editor on acme-data reaches only itself; no self-edge'),
+    ('09-privesc-impersonation-1hop', 'half_sa', '*',            false, 'actAs on shop-sa without a workload-creation permission on acme-web'),
+    ('09-privesc-impersonation-1hop', 'editor_sa', 'editor_sa',  false, 'no self-edge'),
+    ('09-privesc-impersonation-1hop', 'editor_sa', 'datakeys_sa', true, 'roles/editor on acme-data creates keys; acme-data restores the default'),
+    ('09-privesc-impersonation-1hop', 'datakeys_sa', 'editor_sa', true, 'key admin on acme-data; its project policy restores the default under the enforcing folder'),
+    ('09-privesc-impersonation-1hop', 'webkeys_sa', '*',         false, 'key admin on acme-web, which inherits iam.disableServiceAccountKeyCreation from the folder'),
+    ('09-privesc-impersonation-1hop', 'minter_sa', 'web_sa',     true,  'Token Creator on web-sa mints its token without a key'),
+    ('09-privesc-impersonation-1hop', 'minter_sa', 'shop_sa',    false, 'Token Creator is on web-sa only'),
+    ('09-privesc-impersonation-1hop', 'runner_sa', 'shop_sa',    true,  'actAs on shop-sa and run.services.create in acme-web'),
+    ('09-privesc-impersonation-1hop', 'runner_sa', 'web_sa',     false, 'run.services.create in acme-web but no actAs on web-sa'),
 
     ('14-credential-deploys-code', 'build_sa', 'web',  true,  'run.services.update on web and actAs on web-sa'),
     ('14-credential-deploys-code', 'half_sa',  '*',    false, 'update on web but actAs only on shop-sa, the runtime SA of another service'),
     ('14-credential-deploys-code', 'ci_sa',    '*',    false, 'actAs on web-sa without run.services.update'),
+    ('14-credential-deploys-code', 'runner_sa', 'shop', true, 'run.admin on acme-web updates shop, and actAs on shop-sa'),
 
     ('20-base-image-poisoning', 'ci_sa',   'web',  true,  'upload on the base repo, whose python image is a diff_ids prefix of the serving web image'),
     ('20-base-image-poisoning', 'ci_sa',   'shop', false, 'the shop image has no collected base'),
@@ -146,11 +158,13 @@ JOIN n ON n.k = 'trg_web'
 LEFT JOIN abstract_edge a ON a.rule = '06-repo-push-builds' AND a.dst = n.id
 WHERE coalesce(list_contains(CAST(a.witness->'$.pushers' AS VARCHAR[]), x.who), false) <> x.push
 UNION ALL
--- Rule 09 reports which path made each edge.
-SELECT 'rule 09 witness lacks the path', x.src || ' > admin_sa via ' || x.via
-FROM (VALUES ('keys_sa', 'iam.serviceAccountKeys.create'),
-             ('ci_sa', 'iam.serviceAccounts.actAs + cloudbuild.builds.create')) x(src, via)
-JOIN n s ON s.k = x.src JOIN n d ON d.k = 'admin_sa'
+-- Rule 09 reports which route made each edge.
+SELECT 'rule 09 witness lacks the route', x.src || ' > ' || x.dst || ' via ' || x.via
+FROM (VALUES ('keys_sa', 'admin_sa', 'iam.serviceAccountKeys.create'),
+             ('ci_sa', 'admin_sa', 'iam.serviceAccounts.actAs + cloudbuild.builds.create'),
+             ('minter_sa', 'web_sa', 'iam.serviceAccounts.getAccessToken'),
+             ('runner_sa', 'shop_sa', 'iam.serviceAccounts.actAs + run.services.create')) x(src, dst, via)
+JOIN n s ON s.k = x.src JOIN n d ON d.k = x.dst
 WHERE NOT EXISTS (
     SELECT 1 FROM abstract_edge a
     WHERE a.rule = '09-privesc-impersonation-1hop' AND a.src = s.id AND a.dst = d.id

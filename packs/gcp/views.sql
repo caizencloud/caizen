@@ -89,11 +89,15 @@ SELECT data->>'$.name',
        unnest(CAST(coalesce(data->'$.includedPermissions', '[]') AS VARCHAR[]))
 FROM gcp_cai WHERE asset_type = 'iam.googleapis.com/Role';
 
--- Each resource with itself and every ancestor.
+-- Each resource with itself and every ancestor. depth is 0 for the
+-- resource itself and grows toward the organization.
 CREATE VIEW gcp_ancestor AS
-SELECT id AS resource_id, id AS ancestor_id FROM gcp_resource
-UNION
-SELECT r.id, gcp_ancestor_id(a) FROM gcp_resource r, unnest(r.ancestors) t(a);
+SELECT resource_id, ancestor_id, min(depth) AS depth FROM (
+    SELECT id AS resource_id, id AS ancestor_id, 0 AS depth FROM gcp_resource
+    UNION ALL
+    SELECT r.id, gcp_ancestor_id(r.ancestors[i]), i
+    FROM gcp_resource r, generate_series(1, len(r.ancestors)) t(i)
+) GROUP BY ALL;
 
 -- Every permission each member holds on each resource, from bindings on the
 -- resource or any ancestor. Rules filter it by permission.
@@ -151,3 +155,42 @@ WHERE t.label = 'cloudbuild.googleapis.com/BuildTrigger'
 CREATE MACRO gcp_image_repo(image_id) AS regexp_replace(image_id,
     '^https://([a-z0-9-]+)-docker\.pkg\.dev/([^/]+)/([^/]+)/.*$',
     'https://artifactregistry.googleapis.com/projects/\2/locations/\1/repositories/\3');
+
+-- Boolean org policy constraints as set on each node. restore_default
+-- resets a constraint to its default, which is not enforced. Organizations
+-- created from May 2024 get Google's secure-by-default constraints as
+-- explicit policies, which CAI exports, so an unset constraint is not
+-- enforced.
+CREATE VIEW gcp_org_policy AS
+WITH p AS (
+    SELECT record_id AS name, unnest(CAST(data->'$.org_policy' AS JSON[])) AS p
+    FROM record WHERE feed_id = 'gcp-cai-org-policy' AND valid_to IS NULL
+)
+SELECT gcp_id(name) AS resource_id, p->>'$.constraint' AS constraint_name,
+       CASE WHEN (p->'$.restore_default') IS NOT NULL THEN false
+            ELSE TRY_CAST(p->>'$.boolean_policy.enforced' AS BOOLEAN) END AS enforced
+FROM p
+WHERE (p->'$.restore_default') IS NOT NULL OR (p->'$.boolean_policy') IS NOT NULL;
+
+-- The effective value of each boolean constraint on each resource: the
+-- policy set nearest to the resource wins. A resource with no row for a
+-- constraint has it unset, which is not enforced.
+CREATE VIEW gcp_constraint AS
+SELECT a.resource_id, p.constraint_name, arg_min(p.enforced, a.depth) AS enforced
+FROM gcp_ancestor a JOIN gcp_org_policy p ON p.resource_id = a.ancestor_id
+GROUP BY ALL;
+
+-- Permissions that create a workload which runs as a service account the
+-- caller can act as. Code in the workload reads the account's token from
+-- the metadata server, so actAs plus any of these is impersonation without
+-- a key. A new runtime is one row here.
+CREATE VIEW gcp_workload_permission AS
+SELECT * FROM (VALUES
+    ('cloudbuild.builds.create',        'Cloud Build build'),
+    ('run.services.create',             'Cloud Run service'),
+    ('run.jobs.create',                 'Cloud Run job'),
+    ('compute.instances.create',        'Compute Engine instance'),
+    ('cloudfunctions.functions.create', 'Cloud Functions function'),
+    ('workflows.workflows.create',      'Workflows workflow'),
+    ('cloudscheduler.jobs.create',      'Cloud Scheduler job')
+) t(permission, workload);
