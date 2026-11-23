@@ -68,7 +68,7 @@ main:
     - check_sha:
         switch:
           - condition: ${not text.match_regex(sha, "^[0-9a-f]{40}$")}
-            raise: ${"Unexpected commit SHA from " + repo + ": " + sha}
+            raise: ${"The commits endpoint of " + repo + " did not return a commit SHA"}
     - get_commit:
         try:
           call: http.get
